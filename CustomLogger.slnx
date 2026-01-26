@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CommerceConsoleApp/CommerceConsoleApp.csproj" />
+  <Project Path="CustomLogger/CustomLogger.csproj" />
+</Solution>
