@@ -32,17 +32,17 @@ namespace CustomLogger.Providers
                 "logs/app.log",
                 formatter);
             
-            var blobSink = new BlobStorageLogSink(
-                "",
-                "",
-                "app-log.json",
-                formatter);
+            //var blobSink = new BlobStorageLogSink(
+            //    "",
+            //    "",
+            //    "app-log.json",
+            //    formatter);
 
             var sink = new CompositeLogSink(new ILogSink[]
             {
                 consoleSink,
-                fileSink,
-                blobSink
+                fileSink
+                //blobSink
             });
 
             GlobalLogBuffer.Configure(sink);
