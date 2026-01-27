@@ -73,7 +73,6 @@ namespace CustomLogger.Providers
             _disposed = true;
 
             _buffer.Flush();
-            GlobalLogBuffer.Shutdown();
         }
     }
 }

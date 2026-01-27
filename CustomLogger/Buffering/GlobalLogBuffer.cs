@@ -15,20 +15,12 @@ namespace CustomLogger.Buffering
     public static class GlobalLogBuffer
     {
         private static ILogSink _sink;
-        private static AsyncLogDispatcher _dispatcher;
         private static readonly ConcurrentQueue<BufferedLogEntry> _queue =
             new ConcurrentQueue<BufferedLogEntry>();
 
         public static void Configure(ILogSink sink)
         {
-            _dispatcher?.Dispose();
-            _dispatcher = new AsyncLogDispatcher(
-                sink,
-                new BatchOptions
-                {
-                    BatchSize = 50,
-                    FlushInterval = TimeSpan.FromSeconds(2)
-                });
+            _sink = sink;
 
         }
         /// <summary>
@@ -52,14 +44,7 @@ namespace CustomLogger.Buffering
 
             if (_queue.Count >= configuration.Options.MaxBufferSize)
             {
-                if (configuration.Options.DropOldestOnOverflow)
-                {
-                    _queue.TryDequeue(out _); // descarta o mais antigo
-                }
-                else
-                {
-                    return; // drop silencioso
-                }
+                Flush();
             }
         }
 
@@ -80,20 +65,7 @@ namespace CustomLogger.Buffering
         /// </summary>
         private static void Write(BufferedLogEntry entry)
         {
-            try
-            {
-                _dispatcher.Enqueue(entry);
-            }
-            catch (Exception ex)
-            {
-                new FallbackLogSink().WriteFallback(entry, ex);
-            }
+            _sink?.Write(entry);
         }
-
-        public static void Shutdown()
-        {
-            _dispatcher?.Dispose();
-        }
-
     }
 }

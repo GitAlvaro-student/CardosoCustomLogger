@@ -26,6 +26,7 @@ namespace CustomLogger.Sinks
                 throw new ArgumentException(nameof(containerName));
 
             if (string.IsNullOrWhiteSpace(blobName))
+
                 throw new ArgumentException(nameof(blobName));
 
             _formatter = formatter

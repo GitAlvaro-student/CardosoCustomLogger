@@ -48,4 +48,4 @@ using (logger.BeginScope(scopes))
 }
 
 activity.Stop();
-Thread.Sleep(10000); // Aguarda para garantir que os logs sejam despachados antes de sair
+Thread.Sleep(1000);

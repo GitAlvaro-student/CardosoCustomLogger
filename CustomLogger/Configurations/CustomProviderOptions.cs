@@ -39,14 +39,14 @@ namespace CustomLogger.Configurations
         /// </summary>
         public bool AlwaysLogExceptions { get; set; } = true;
 
-        /// <summary>
-        /// Indica se a Fila deve ser descartada quando o buffer estiver cheio.
-        /// </summary>
-        public bool DropOldestOnOverflow { get; set; } = true;
+        ///// <summary>
+        ///// Indica se a Fila deve ser descartada quando o buffer estiver cheio.
+        ///// </summary>
+        //public bool DropOldestOnOverflow { get; set; } = true;
 
-        /// <summary>
-        /// Indica se Fallback Sink deve ser habilitado.
-        /// </summary>
-        public bool EnableFallbackSink { get; set; } = true;
+        ///// <summary>
+        ///// Indica se Fallback Sink deve ser habilitado.
+        ///// </summary>
+        //public bool EnableFallbackSink { get; set; } = true;
     }
 }
