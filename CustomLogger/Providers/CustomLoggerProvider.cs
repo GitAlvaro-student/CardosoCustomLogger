@@ -17,38 +17,17 @@ namespace CustomLogger.Providers
     {
         private readonly CustomProviderConfiguration _configuration;
         private readonly ILogBuffer _buffer;
+        private readonly ILogSink _sink;
         private bool _disposed;
 
         public CustomLoggerProvider(CustomProviderConfiguration configuration)
         {
-            _configuration = configuration
-                ?? throw new ArgumentNullException(nameof(configuration));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
             var formatter = new JsonLogFormatter();
+            _sink = new ConsoleLogSink(formatter);
 
-            var consoleSink = new ConsoleLogSink(formatter);
-            
-            var fileSink = new FileLogSink(
-                "logs/app.log",
-                formatter);
-            
-            //var blobSink = new BlobStorageLogSink(
-            //    "",
-            //    "",
-            //    "app-log.json",
-            //    formatter);
-
-            var sink = new CompositeLogSink(new ILogSink[]
-            {
-                consoleSink,
-                fileSink
-                //blobSink
-            });
-
-            GlobalLogBuffer.Configure(sink);
-
-            // 4️⃣ Adapter que expõe o buffer global como ILogBuffer
-            _buffer = new GlobalLogBufferAdapter(_configuration);
+            _buffer = new InstanceLogBuffer(_sink, _configuration.Options);
         }
 
         public ILogger CreateLogger(string categoryName)
@@ -67,12 +46,15 @@ namespace CustomLogger.Providers
 
         public void Dispose()
         {
-            if (_disposed)
-                return;
-
+            if (_disposed) return;
             _disposed = true;
 
             _buffer.Flush();
+
+            if (_sink is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
     }
 }

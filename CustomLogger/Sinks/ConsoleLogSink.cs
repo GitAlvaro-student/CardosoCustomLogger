@@ -23,7 +23,14 @@ namespace CustomLogger.Sinks
             if (entry == null)
                 return;
 
-            Console.WriteLine(_formatter.Format(entry));
+            try
+            {
+                Console.WriteLine(_formatter.Format(entry));
+            }
+            catch
+            {
+                // Absorve falha localmente
+            }
         }
     }
 }

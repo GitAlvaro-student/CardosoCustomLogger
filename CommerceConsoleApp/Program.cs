@@ -6,16 +6,12 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 #region Logger
-AppDomain.CurrentDomain.ProcessExit += (_, __) =>
-{
-    GlobalLogBuffer.Flush();
-};
 
 var options = new CustomProviderOptions
 {
     MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    MaxBufferSize = 10
+    MaxBufferSize = 1
 };
 
 var configuration = new CustomProviderConfiguration(options);
