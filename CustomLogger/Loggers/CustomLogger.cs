@@ -75,17 +75,16 @@ namespace CustomLogger.Loggers
 
             // Neste ponto, apenas estruturamos o evento.
             // A escrita real será responsabilidade do buffer/sink futuramente.
-            var entry = new BufferedLogEntry
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Category = _categoryName,
-                LogLevel = logLevel,
-                EventId = eventId,
-                Message = message,
-                Exception = exception,
-                State = state,
-                Scopes = _logScopeProvider.GetScopes()
-            };
+            var entry = new BufferedLogEntry(
+                DateTimeOffset.UtcNow,
+                _categoryName,
+                logLevel,
+                eventId,
+                message,
+                exception,
+                state,
+                _logScopeProvider.GetScopes()
+            );
 
             _buffer.Enqueue(entry);
 
