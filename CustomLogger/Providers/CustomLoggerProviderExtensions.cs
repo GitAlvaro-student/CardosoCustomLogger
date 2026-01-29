@@ -17,18 +17,18 @@ namespace CustomLogger.Providers
         /// </summary>
         public static ILoggingBuilder AddCustomLogging(
             this ILoggingBuilder builder,
-            Action<CustomProviderOptions> configure)
+            Action<CustomProviderOptions> configureOptions,
+            Action<CustomLoggerProviderBuilder> configureSinks)
         {
-            if (builder == null)
-                throw new ArgumentNullException(nameof(builder));
-
             var options = new CustomProviderOptions();
-            configure?.Invoke(options);
+            configureOptions?.Invoke(options);
 
-            var configuration = new CustomProviderConfiguration(options);
+            var providerBuilder = new CustomLoggerProviderBuilder()
+                .WithOptions(options);
 
-            builder.AddProvider(new CustomLoggerProvider(configuration));
+            configureSinks?.Invoke(providerBuilder);
 
+            builder.AddProvider(providerBuilder.Build());
             return builder;
         }
     }

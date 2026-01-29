@@ -6,6 +6,7 @@ using CustomLogger.Scopes;
 using CustomLogger.Sinks;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 
 namespace CustomLogger.Providers
 {
@@ -17,17 +18,24 @@ namespace CustomLogger.Providers
     {
         private readonly CustomProviderConfiguration _configuration;
         private readonly ILogBuffer _buffer;
-        private readonly ILogSink _sink;
+        private readonly List<IDisposable> _disposables = new List<IDisposable>();
         private bool _disposed;
 
-        public CustomLoggerProvider(CustomProviderConfiguration configuration)
+        // Construtor público para uso com builder
+        public CustomLoggerProvider(
+            CustomProviderOptions options,
+            ILogSink sink,
+            IEnumerable<ILogSink> sinksToTrack)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _configuration = new CustomProviderConfiguration(options);
+            _buffer = new InstanceLogBuffer(sink, options);
 
-            var formatter = new JsonLogFormatter();
-            _sink = new ConsoleLogSink(formatter);
-
-            _buffer = new InstanceLogBuffer(_sink, _configuration.Options);
+            // Rastreia sinks descartáveis
+            foreach (var s in sinksToTrack)
+            {
+                if (s is IDisposable disposable)
+                    _disposables.Add(disposable);
+            }
         }
 
         public ILogger CreateLogger(string categoryName)
@@ -36,12 +44,7 @@ namespace CustomLogger.Providers
                 throw new ObjectDisposedException(nameof(CustomLoggerProvider));
 
             var scopeProvider = new LogScopeProvider();
-
-            return new Loggers.CustomLogger(
-                categoryName,
-                _configuration,
-                _buffer,
-                scopeProvider);
+            return new Loggers.CustomLogger(categoryName, _configuration, _buffer, scopeProvider);
         }
 
         public void Dispose()
@@ -51,9 +54,10 @@ namespace CustomLogger.Providers
 
             _buffer.Flush();
 
-            if (_sink is IDisposable disposable)
+            foreach (var disposable in _disposables)
             {
-                disposable.Dispose();
+                try { disposable.Dispose(); }
+                catch { /* Absorve */ }
             }
         }
     }

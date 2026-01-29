@@ -3,6 +3,7 @@ using CustomLogger.Configurations;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CustomLogger.Buffering
@@ -39,17 +40,23 @@ namespace CustomLogger.Buffering
 
         public void Flush()
         {
+            Debug.WriteLine($"[DEBUG] Flush chamado. Itens na fila: {_queue.Count}");
+
             while (_queue.TryDequeue(out var entry))
             {
+                Debug.WriteLine($"[DEBUG] Processando log: {entry.Message}");
+
                 try
                 {
                     _sink.Write(entry);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Absorve falha - não derruba aplicação
+                    Debug.WriteLine($"[DEBUG] Erro no sink: {ex.Message}");
                 }
             }
+
+            Debug.WriteLine("[DEBUG] Flush concluído");
         }
     }
 }
