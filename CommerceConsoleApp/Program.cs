@@ -11,14 +11,24 @@ var options = new CustomProviderOptions
 {
     MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    MaxBufferSize = 1
+    MaxBufferSize = 50
 };
 
-var configuration = new CustomProviderConfiguration(options);
+var provider = new CustomLoggerProviderBuilder()
+    .WithOptions(options)
+    .AddConsoleSink()
+    .AddFileSink("logs/app.log")
+    .AddBlobSink("", "", "app-log.json")  // Strings vazias OK para validação
+    .Build();
 
 var loggerFactory = LoggerFactory.Create(builder =>
 {
-    builder.AddProvider(new CustomLoggerProvider(configuration));
+    builder.AddProvider(provider);
+    //builder.AddCustomLogging(
+    //    opts => opts.MinimumLogLevel = LogLevel.Information,
+    //    sinks => sinks.WithOptions(options).AddConsoleSink()
+    //    .AddFileSink("app.log")
+    //    );
 });
 
 var logger = loggerFactory.CreateLogger("Test");

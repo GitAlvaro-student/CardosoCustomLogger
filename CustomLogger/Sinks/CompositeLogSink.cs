@@ -18,7 +18,14 @@ namespace CustomLogger.Sinks
         {
             foreach (var sink in _sinks)
             {
-                sink.Write(entry);
+                try
+                {
+                    sink.Write(entry);
+                }
+                catch
+                {
+                    // Falha em um sink não derruba os outros
+                }
             }
         }
     }
