@@ -56,5 +56,34 @@ using (logger.BeginScope(scopes))
 
 }
 
+//using (logger.BeginScope(new { UserId = "123" }))      // Externo
+//using (logger.BeginScope(new { UserId = "456" }))      // Interno
+//{
+//    logger.LogInformation("Test");
+//    // ✅ Resultado: UserId = "456" (interno prevalece)
+//}
+
+// Thread A
+//using (logger.BeginScope(new { Request = "A" }))
+//{
+//    await Task.Delay(100);
+//    logger.LogInformation("A");  // ✅ Request = "A"
+//}
+
+//// Thread B (paralelo)
+//using (logger.BeginScope(new { Request = "B" }))
+//{
+//    logger.LogInformation("B");  // ✅ Request = "B" (isolado)
+//}
+
+var logger1 = loggerFactory.CreateLogger("Test1");
+var logger2 = loggerFactory.CreateLogger("Test2");
+
+// Escopo apenas para logger1
+using (logger1.BeginScope(new { Feature = "A" }))
+{
+    logger1.LogInformation("Msg1");  // ✅ Deve ter Feature = "A"
+    logger2.LogInformation("Msg2");  // ❌ NÃO deve ter Feature
+}
 activity.Stop();
 Thread.Sleep(1000);

@@ -8,8 +8,7 @@ namespace CustomLogger.Scopes
 {
     public sealed class LogScopeProvider : ILogScopeProvider
     {
-        private static readonly AsyncLocal<Stack<object>> _scopes =
-            new AsyncLocal<Stack<object>>();
+        private static readonly AsyncLocal<Stack<object>> _scopes = new AsyncLocal<Stack<object>>();
 
         public IDisposable Push(object state)
         {
@@ -18,29 +17,52 @@ namespace CustomLogger.Scopes
 
             _scopes.Value.Push(state);
 
-            return new Scope(() =>
+            return new LogScope(() =>
             {
-                _scopes.Value.Pop();
+                if (_scopes.Value != null && _scopes.Value.Count > 0)
+                    _scopes.Value.Pop();
             });
         }
 
+        /// <summary>
+        /// Captura todos os escopos ativos no contexto atual.
+        /// REGRA DE COLISÃO: Scope mais interno (último BeginScope) prevalece.
+        /// Exemplo:
+        ///   using (BeginScope(new { UserId = "123" }))
+        ///   using (BeginScope(new { UserId = "456" }))
+        ///   // Resultado: UserId = "456"
+        /// </summary>
         public IReadOnlyDictionary<string, object> GetScopes()
         {
             var result = new Dictionary<string, object>();
 
-            if (_scopes.Value == null)
+            if (_scopes.Value == null || _scopes.Value.Count == 0)
                 return result;
 
+            // ✅ REGRA: Scope mais INTERNO prevalece (último empilhado)
+            // Itera do topo da pilha para a base
             foreach (var scope in _scopes.Value)
             {
                 if (scope is IEnumerable<KeyValuePair<string, object>> kvs)
                 {
                     foreach (var kv in kvs)
-                        result[kv.Key] = kv.Value;
+                    {
+                        // ✅ Só adiciona se chave ainda não existe
+                        // Garante que scope interno prevalece
+                        if (!result.ContainsKey(kv.Key))
+                        {
+                            result[kv.Key] = kv.Value;
+                        }
+                    }
                 }
                 else
                 {
-                    result["scope"] = scope;
+                    // ✅ Scope genérico: usa índice sequencial
+                    var key = $"scope_{_scopes.Value.Count - 1}";
+                    if (!result.ContainsKey(key))
+                    {
+                        result[key] = scope;
+                    }
                 }
             }
 
@@ -48,3 +70,4 @@ namespace CustomLogger.Scopes
         }
     }
 }
+
