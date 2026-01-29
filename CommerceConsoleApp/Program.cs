@@ -11,7 +11,7 @@ var options = new CustomProviderOptions
 {
     MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    MaxBufferSize = 1
+    MaxBufferSize = 50
 };
 
 var provider = new CustomLoggerProviderBuilder()
