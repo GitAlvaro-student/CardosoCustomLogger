@@ -27,26 +27,6 @@ namespace CustomLogger.Configurations
         /// </summary>
         public int MaxBufferSize { get; set; } = 1000;
 
-        /// <summary>
-        /// Intervalo máximo para descarregar o buffer.
-        /// Pode ser utilizado por timers externos.
-        /// </summary>
-        public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(5);
-
-        /// <summary>
-        /// Indica se exceções devem ser sempre registradas,
-        /// independentemente do nível de log.
-        /// </summary>
-        public bool AlwaysLogExceptions { get; set; } = true;
-
-        ///// <summary>
-        ///// Indica se a Fila deve ser descartada quando o buffer estiver cheio.
-        ///// </summary>
-        //public bool DropOldestOnOverflow { get; set; } = true;
-
-        ///// <summary>
-        ///// Indica se Fallback Sink deve ser habilitado.
-        ///// </summary>
-        //public bool EnableFallbackSink { get; set; } = true;
+        public BatchOptions BatchOptions { get; set; } = new BatchOptions();
     }
 }

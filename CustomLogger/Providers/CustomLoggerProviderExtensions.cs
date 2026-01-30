@@ -31,5 +31,51 @@ namespace CustomLogger.Providers
             builder.AddProvider(providerBuilder.Build());
             return builder;
         }
+
+        // ✅ Para Web API .NET Framework 4.7.2
+        public static ILoggingBuilder AddCustomLogging(
+            this ILoggingBuilder builder,
+            Action<CustomProviderOptions> configure)
+        {
+            if (builder == null)
+                throw new ArgumentNullException(nameof(builder));
+
+            var options = new CustomProviderOptions();
+            configure?.Invoke(options);
+
+            var provider = new CustomLoggerProviderBuilder()
+                .WithOptions(options)
+                .AddConsoleSink()
+                .AddFileSink("App_Data/logs/app.log")  // ← Path padrão
+                .Build();
+
+            builder.AddProvider(provider);
+            return builder;
+        }
+
+        // ✅ Para aplicações sem ILoggingBuilder
+        public static ILoggerFactory CreateCustomLoggerFactory(
+            Action<CustomProviderOptions> configure = null)
+        {
+            var options = new CustomProviderOptions
+            {
+                MinimumLogLevel = LogLevel.Information,
+                UseGlobalBuffer = true,
+                MaxBufferSize = 50
+            };
+
+            configure?.Invoke(options);
+
+            var provider = new CustomLoggerProviderBuilder()
+                .WithOptions(options)
+                .AddConsoleSink()
+                .AddFileSink("logs/app.log")
+                .Build();
+
+            return LoggerFactory.Create(builder =>
+            {
+                builder.AddProvider(provider);
+            });
+        }
     }
 }

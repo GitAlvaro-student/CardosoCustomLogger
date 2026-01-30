@@ -50,6 +50,28 @@ namespace CustomLogger.Sinks
             {
                 var json = _formatter.Format(entry);
                 _writer.WriteLine(json);
+                _writer.Flush();
+            }
+            catch
+            {
+                // Absorve falha
+            }
+        }
+
+        // ✅ NOVO: Escrita em lote
+        public void WriteBatch(IEnumerable<ILogEntry> entries)
+        {
+            if (_disposed || entries == null)
+                return;
+
+            try
+            {
+                foreach (var entry in entries)
+                {
+                    var json = _formatter.Format(entry);
+                    _writer.WriteLine(json);
+                }
+                _writer.Flush();  // ✅ Flush UMA VEZ para todo o batch
             }
             catch
             {

@@ -7,6 +7,7 @@ using CustomLogger.Sinks;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace CustomLogger.Providers
 {
@@ -49,15 +50,25 @@ namespace CustomLogger.Providers
 
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+                return;
+
             _disposed = true;
 
+            // ✅ 1. Flush do buffer PRIMEIRO
             _buffer.Flush();
 
+            // ✅ 2. Dispose do buffer (para timer)
+            if (_buffer is IDisposable disposableBuffer)
+            {
+                disposableBuffer.Dispose();
+            }
+
+            // ✅ 3. Dispose dos sinks POR ÚLTIMO
             foreach (var disposable in _disposables)
             {
                 try { disposable.Dispose(); }
-                catch { /* Absorve */ }
+                catch { }
             }
         }
     }
