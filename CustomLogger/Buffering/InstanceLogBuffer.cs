@@ -6,10 +6,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CustomLogger.Buffering
 {
-    public sealed class InstanceLogBuffer : ILogBuffer, IDisposable
+    public sealed class InstanceLogBuffer : IAsyncLogBuffer, IDisposable
     {
         private readonly ILogSink _sink;
         private readonly ConcurrentQueue<ILogEntry> _queue = new ConcurrentQueue<ILogEntry>();
@@ -60,7 +61,6 @@ namespace CustomLogger.Buffering
             if (_disposed)
                 return;
 
-            Debug.WriteLine("Buffer Flusheado ---------------------");
             // ✅ Evita flush concorrente
             lock (_flushLock)
             {
@@ -105,6 +105,81 @@ namespace CustomLogger.Buffering
                     }
                 }
             }
+        }
+
+        public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
+        {
+            if (_disposed || entry == null)
+                return;
+
+            if (!_options.UseGlobalBuffer)
+            {
+                if (_sink is IAsyncLogSink asyncSink)
+                {
+                    await asyncSink.WriteAsync(entry, cancellationToken);
+                }
+                else
+                {
+                    _sink.Write(entry);  // ✅ Fallback síncrono
+                }
+                return;
+            }
+
+            _queue.Enqueue(entry);
+
+            if (_queue.Count >= _options.BatchOptions.BatchSize)
+            {
+                await FlushAsync(cancellationToken);
+            }
+        }
+
+        // ✅ NOVO: Flush assíncrono
+        public async Task FlushAsync(CancellationToken cancellationToken = default)
+        {
+            if (_disposed)
+                return;
+
+            await Task.Run(() =>
+            {
+                lock (_flushLock)
+                {
+                    if (_queue.IsEmpty)
+                        return;
+
+                    var batch = new List<ILogEntry>();
+                    while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
+                    {
+                        batch.Add(entry);
+                    }
+
+                    if (batch.Count == 0)
+                        return;
+
+                    // ✅ Usa async se disponível
+                    if (_sink is IAsyncBatchLogSink asyncBatchSink)
+                    {
+                        asyncBatchSink.WriteBatchAsync(batch, cancellationToken).GetAwaiter().GetResult();
+                    }
+                    else if (_sink is IBatchLogSink batchSink)
+                    {
+                        batchSink.WriteBatch(batch);
+                    }
+                    else
+                    {
+                        foreach (var entry in batch)
+                        {
+                            if (_sink is IAsyncLogSink asyncSink)
+                            {
+                                asyncSink.WriteAsync(entry, cancellationToken).GetAwaiter().GetResult();
+                            }
+                            else
+                            {
+                                _sink.Write(entry);
+                            }
+                        }
+                    }
+                }
+            }, cancellationToken);
         }
 
         public void Dispose()

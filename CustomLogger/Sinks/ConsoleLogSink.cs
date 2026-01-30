@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CustomLogger.Sinks
 {
@@ -9,7 +11,7 @@ namespace CustomLogger.Sinks
     /// Sink simples para escrita de logs no console.
     /// Usado apenas para validação do pipeline.
     /// </summary>
-    public sealed class ConsoleLogSink : IBatchLogSink, IDisposable
+    public sealed class ConsoleLogSink : IAsyncBatchLogSink, IDisposable
     {
         private readonly ILogFormatter _formatter;
 
@@ -46,6 +48,42 @@ namespace CustomLogger.Sinks
                     Console.WriteLine(_formatter.Format(entry));
                 }
                 Console.Out.Flush();  // ✅ Flush UMA VEZ
+            }
+            catch
+            {
+                // Absorve falha
+            }
+        }
+
+        // ✅ NOVO: Write assíncrono
+        public async Task WriteAsync(ILogEntry entry, CancellationToken cancellationToken = default)
+        {
+            if (entry == null)
+                return;
+
+            try
+            {
+                await Console.Out.WriteLineAsync(_formatter.Format(entry));
+            }
+            catch
+            {
+                // Absorve falha
+            }
+        }
+
+        // ✅ NOVO: WriteBatch assíncrono
+        public async Task WriteBatchAsync(IEnumerable<ILogEntry> entries, CancellationToken cancellationToken = default)
+        {
+            if (entries == null)
+                return;
+
+            try
+            {
+                foreach (var entry in entries)
+                {
+                    await Console.Out.WriteLineAsync(_formatter.Format(entry));
+                }
+                await Console.Out.FlushAsync();
             }
             catch
             {

@@ -40,21 +40,19 @@ var scopes = new Dictionary<string, object>
 };
 
 #region Logs
-//using (logger.BeginScope(scopes))
-//{
-//    logger.LogInformation("CommerceConsoleApp iniciada com sucesso.");
+using (logger.BeginScope(scopes))
+{
+    logger.LogInformation("CommerceConsoleApp iniciada com sucesso.");
 
-//    logger.LogTrace("This is a trace log, useful for debugging.");
-//    logger.LogDebug("This is a debug log, useful for development.");
-//    logger.LogInformation("This is an information log, useful for general information.");
-//    logger.LogWarning("This is a warning log, indicating a potential issue.");
-//    logger.LogError(new InvalidOperationException("Invalid Generic Operation"), "This is an error log, indicating a failure in the application.");
-//    logger.LogCritical("This is a critical log, indicating a severe failure.");
-//}
+    logger.LogTrace("This is a trace log, useful for debugging.");
+    logger.LogDebug("This is a debug log, useful for development.");
+    logger.LogInformation("This is an information log, useful for general information.");
+    logger.LogWarning("This is a warning log, indicating a potential issue.");
+    logger.LogError(new InvalidOperationException("Invalid Generic Operation"), "This is an error log, indicating a failure in the application.");
+    logger.LogCritical("This is a critical log, indicating a severe failure.");
+}
 #endregion
 
-
-logger.LogInformation("Log {i} Information", "TesteDisposeFinal");
 provider.Dispose();
 
 activity.Stop();
