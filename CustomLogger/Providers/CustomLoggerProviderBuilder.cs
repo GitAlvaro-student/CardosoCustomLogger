@@ -31,9 +31,9 @@ namespace CustomLogger.Providers
             return this;
         }
 
-        public CustomLoggerProviderBuilder AddBlobSink(string connectionString, string container, string blobName, ILogFormatter formatter = null)
+        public CustomLoggerProviderBuilder AddBlobSink(string connectionString, string container, ILogFormatter formatter = null)
         {
-            _sinks.Add(new BlobStorageLogSink(connectionString, container, blobName, formatter ?? new JsonLogFormatter()));
+            _sinks.Add(new BlobStorageLogSink(connectionString, container, formatter ?? new JsonLogFormatter()));
             return this;
         }
 

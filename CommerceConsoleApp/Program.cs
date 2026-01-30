@@ -1,12 +1,21 @@
 ﻿// See https://aka.ms/new-console-template for more information
-using CustomLogger.Buffering;
 using CustomLogger.Configurations;
 using CustomLogger.Providers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Runtime.Serialization;
+using Microsoft.Extensions.Configuration;
 
 #region Logger
+// Constrói a configuração
+var builder = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appSettings.json", optional: false, reloadOnChange: true);
+
+IConfiguration config = builder.Build();
+
+// Ler valores simples
+string container = config["Azure:ContainerName"]!;
+string connectionString = config["Azure:ConnectionString"]!;
 
 var options = new CustomProviderOptions
 {
@@ -22,6 +31,7 @@ var provider = new CustomLoggerProviderBuilder()
     .WithOptions(options)
     .AddConsoleSink()
     .AddFileSink("logs/app.log")
+    .AddBlobSink(connectionString, container)
     .Build();
 
 var loggerFactory = LoggerFactory.Create(builder =>
