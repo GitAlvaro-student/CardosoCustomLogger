@@ -9,7 +9,7 @@ namespace CustomLogger.Sinks
     /// Sink simples para escrita de logs no console.
     /// Usado apenas para validação do pipeline.
     /// </summary>
-    public sealed class ConsoleLogSink : ILogSink
+    public sealed class ConsoleLogSink : ILogSink, IDisposable
     {
         private readonly ILogFormatter _formatter;
 
@@ -23,7 +23,26 @@ namespace CustomLogger.Sinks
             if (entry == null)
                 return;
 
-            Console.WriteLine(_formatter.Format(entry));
+            try
+            {
+                Console.WriteLine(_formatter.Format(entry));
+            }
+            catch
+            {
+                // Absorve falha localmente
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                Console.Out.Flush();
+            }
+            catch
+            {
+                // Absorve falha
+            }
         }
     }
 }

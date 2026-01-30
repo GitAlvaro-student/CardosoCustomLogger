@@ -46,8 +46,15 @@ namespace CustomLogger.Sinks
             if (_disposed || entry == null)
                 return;
 
-            var json = _formatter.Format(entry);
-            _writer.WriteLine(json);
+            try
+            {
+                var json = _formatter.Format(entry);
+                _writer.WriteLine(json);
+            }
+            catch
+            {
+                // Absorve falha
+            }
         }
 
         public void Dispose()

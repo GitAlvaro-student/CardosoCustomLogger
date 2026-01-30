@@ -14,6 +14,6 @@ namespace CustomLogger.Abstractions
         string Message { get; }
         Exception Exception { get; }
         object State { get; }
-        IReadOnlyDictionary<string, object> Scopes { get; set; }
+        IReadOnlyDictionary<string, object> Scopes { get; }
     }
 }

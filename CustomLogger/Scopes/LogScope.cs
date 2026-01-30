@@ -5,18 +5,23 @@ using System.Text;
 namespace CustomLogger.Scopes
 {
 
-    public sealed class Scope : IDisposable
+    public sealed class LogScope : IDisposable
     {
-        private readonly Action _onDispose;
+        private readonly Action _dispose;
+        private bool _disposed;
 
-        public Scope(Action onDispose)
+        public LogScope(Action dispose)
         {
-            _onDispose = onDispose;
+            _dispose = dispose;
         }
 
         public void Dispose()
         {
-            _onDispose();
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _dispose?.Invoke();
         }
     }
 }

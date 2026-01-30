@@ -26,6 +26,7 @@ namespace CustomLogger.Sinks
                 throw new ArgumentException(nameof(containerName));
 
             if (string.IsNullOrWhiteSpace(blobName))
+
                 throw new ArgumentException(nameof(blobName));
 
             _formatter = formatter
@@ -47,15 +48,21 @@ namespace CustomLogger.Sinks
 
         public void Write(ILogEntry entry)
         {
-            if (entry == null)
-                return;
+            if (entry == null) return;
 
-            var json = _formatter.Format(entry) + Environment.NewLine;
-            var bytes = Encoding.UTF8.GetBytes(json);
-
-            using (var stream = new MemoryStream(bytes))
+            try
             {
-                _blobClient.AppendBlock(stream);
+                var json = _formatter.Format(entry) + Environment.NewLine;
+                var bytes = Encoding.UTF8.GetBytes(json);
+
+                using (var stream = new MemoryStream(bytes))
+                {
+                    _blobClient.AppendBlock(stream);
+                }
+            }
+            catch
+            {
+                // Absorve falha
             }
         }
     }

@@ -6,6 +6,7 @@ using CustomLogger.Scopes;
 using CustomLogger.Sinks;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 
 namespace CustomLogger.Providers
 {
@@ -17,38 +18,24 @@ namespace CustomLogger.Providers
     {
         private readonly CustomProviderConfiguration _configuration;
         private readonly ILogBuffer _buffer;
+        private readonly List<IDisposable> _disposables = new List<IDisposable>();
         private bool _disposed;
 
-        public CustomLoggerProvider(CustomProviderConfiguration configuration)
+        // Construtor público para uso com builder
+        public CustomLoggerProvider(
+            CustomProviderOptions options,
+            ILogSink sink,
+            IEnumerable<ILogSink> sinksToTrack)
         {
-            _configuration = configuration
-                ?? throw new ArgumentNullException(nameof(configuration));
+            _configuration = new CustomProviderConfiguration(options);
+            _buffer = new InstanceLogBuffer(sink, options);
 
-            var formatter = new JsonLogFormatter();
-
-            var consoleSink = new ConsoleLogSink(formatter);
-            
-            var fileSink = new FileLogSink(
-                "logs/app.log",
-                formatter);
-            
-            var blobSink = new BlobStorageLogSink(
-                "",
-                "",
-                "app-log.json",
-                formatter);
-
-            var sink = new CompositeLogSink(new ILogSink[]
+            // Rastreia sinks descartáveis
+            foreach (var s in sinksToTrack)
             {
-                consoleSink,
-                fileSink,
-                blobSink
-            });
-
-            GlobalLogBuffer.Configure(sink);
-
-            // 4️⃣ Adapter que expõe o buffer global como ILogBuffer
-            _buffer = new GlobalLogBufferAdapter(_configuration);
+                if (s is IDisposable disposable)
+                    _disposables.Add(disposable);
+            }
         }
 
         public ILogger CreateLogger(string categoryName)
@@ -57,23 +44,21 @@ namespace CustomLogger.Providers
                 throw new ObjectDisposedException(nameof(CustomLoggerProvider));
 
             var scopeProvider = new LogScopeProvider();
-
-            return new Loggers.CustomLogger(
-                categoryName,
-                _configuration,
-                _buffer,
-                scopeProvider);
+            return new Loggers.CustomLogger(categoryName, _configuration, _buffer, scopeProvider);
         }
 
         public void Dispose()
         {
-            if (_disposed)
-                return;
-
+            if (_disposed) return;
             _disposed = true;
 
             _buffer.Flush();
-            GlobalLogBuffer.Shutdown();
+
+            foreach (var disposable in _disposables)
+            {
+                try { disposable.Dispose(); }
+                catch { /* Absorve */ }
+            }
         }
     }
 }
