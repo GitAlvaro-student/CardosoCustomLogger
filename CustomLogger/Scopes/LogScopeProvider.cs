@@ -8,7 +8,7 @@ namespace CustomLogger.Scopes
 {
     public sealed class LogScopeProvider : ILogScopeProvider
     {
-        private static readonly AsyncLocal<Stack<object>> _scopes = new AsyncLocal<Stack<object>>();
+        private readonly AsyncLocal<Stack<object>> _scopes = new AsyncLocal<Stack<object>>();
 
         public IDisposable Push(object state)
         {
