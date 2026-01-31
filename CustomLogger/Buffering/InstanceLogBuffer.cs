@@ -17,12 +17,22 @@ namespace CustomLogger.Buffering
         private readonly CustomProviderOptions _options;
         private readonly Timer _flushTimer;
         private readonly object _flushLock = new object();
+        private readonly SemaphoreSlim _blockingSemaphore;
         private bool _disposed;
+        private long _droppedLogsCount;
 
         public InstanceLogBuffer(ILogSink sink, CustomProviderOptions options)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _options = options ?? throw new ArgumentNullException(nameof(options));
+
+            if (_options.BackpressureOptions.OverflowStrategy == OverflowStrategy.Block)
+            {
+                _blockingSemaphore = new SemaphoreSlim(
+                    _options.BackpressureOptions.MaxQueueCapacity,
+                    _options.BackpressureOptions.MaxQueueCapacity
+                );
+            }
 
             // ✅ Timer para flush periódico
             if (_options.BatchOptions.FlushInterval > TimeSpan.Zero)
@@ -47,63 +57,15 @@ namespace CustomLogger.Buffering
                 return;
             }
 
-            _queue.Enqueue(entry);
+            // ✅ CORRIGIDO: Aguardar semáforo ANTES de enfileirar
+            if (!TryEnqueueWithBackpressure(entry))
+            {
+                return;
+            }
 
-            // ✅ Flush por tamanho (batch size)
             if (_queue.Count >= _options.BatchOptions.BatchSize)
             {
                 Flush();
-            }
-        }
-
-        public void Flush()
-        {
-            if (_disposed)
-                return;
-
-            // ✅ Evita flush concorrente
-            lock (_flushLock)
-            {
-                if (_queue.IsEmpty)
-                    return;
-
-                // ✅ Captura snapshot da fila
-                var batch = new List<ILogEntry>();
-                while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
-                {
-                    batch.Add(entry);
-                }
-
-                if (batch.Count == 0)
-                    return;
-
-                // ✅ Escrita em lote se sink suportar
-                if (_sink is IBatchLogSink batchSink)
-                {
-                    try
-                    {
-                        batchSink.WriteBatch(batch);
-                    }
-                    catch
-                    {
-                        // Absorve falha
-                    }
-                }
-                else
-                {
-                    // ✅ Fallback: escrita individual
-                    foreach (var entry in batch)
-                    {
-                        try
-                        {
-                            _sink.Write(entry);
-                        }
-                        catch
-                        {
-                            // Absorve falha
-                        }
-                    }
-                }
             }
         }
 
@@ -125,7 +87,13 @@ namespace CustomLogger.Buffering
                 return;
             }
 
-            _queue.Enqueue(entry);
+            // ✅ Aplicar backpressure assíncrono
+            if (!await TryEnqueueWithBackpressureAsync(entry, cancellationToken))
+            {
+                return;  // Log descartado
+            }
+
+            //_queue.Enqueue(entry);
 
             if (_queue.Count >= _options.BatchOptions.BatchSize)
             {
@@ -133,7 +101,136 @@ namespace CustomLogger.Buffering
             }
         }
 
-        // ✅ NOVO: Flush assíncrono
+        // ✅ NOVO: Backpressure síncrono
+        private bool TryEnqueueWithBackpressure(ILogEntry entry)
+        {
+            switch (_options.BackpressureOptions.OverflowStrategy)
+            {
+                case OverflowStrategy.DropOldest:
+                    lock (_flushLock)
+                    {
+                        while (_queue.Count >= _options.BackpressureOptions.MaxQueueCapacity)
+                        {
+                            if (_queue.TryDequeue(out _))
+                            {
+                                Interlocked.Increment(ref _droppedLogsCount);
+                            }
+                        }
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                case OverflowStrategy.DropNewest:
+                    // ✅ CORRIGIDO: Lock para checagem + enqueue atômico
+                    lock (_flushLock)
+                    {
+                        if (_queue.Count >= _options.BackpressureOptions.MaxQueueCapacity)
+                        {
+                            Interlocked.Increment(ref _droppedLogsCount);
+                            return false;
+                        }
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                case OverflowStrategy.Block:
+                    _blockingSemaphore.Wait();
+                    lock (_flushLock)
+                    {
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                default:
+                    _queue.Enqueue(entry);
+                    return true;
+            }
+        }
+        // ✅ NOVO: Backpressure assíncrono
+        private async Task<bool> TryEnqueueWithBackpressureAsync(ILogEntry entry, CancellationToken cancellationToken)
+        {
+            switch (_options.BackpressureOptions.OverflowStrategy)
+            {
+                case OverflowStrategy.DropOldest:
+                    lock (_flushLock)
+                    {
+                        while (_queue.Count >= _options.BackpressureOptions.MaxQueueCapacity)
+                        {
+                            if (_queue.TryDequeue(out _))
+                            {
+                                Interlocked.Increment(ref _droppedLogsCount);
+                            }
+                        }
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                case OverflowStrategy.DropNewest:
+                    lock (_flushLock)
+                    {
+                        if (_queue.Count >= _options.BackpressureOptions.MaxQueueCapacity)
+                        {
+                            Interlocked.Increment(ref _droppedLogsCount);
+                            return false;
+                        }
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                case OverflowStrategy.Block:
+                    await _blockingSemaphore.WaitAsync(cancellationToken);
+                    lock (_flushLock)
+                    {
+                        _queue.Enqueue(entry);
+                    }
+                    return true;
+
+                default:
+                    _queue.Enqueue(entry);
+                    return true;
+            }
+        }
+
+        public void Flush()
+        {
+            if (_disposed)
+                return;
+
+            lock (_flushLock)
+            {
+                if (_queue.IsEmpty)
+                    return;
+
+                var batch = new List<ILogEntry>();
+                while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
+                {
+                    batch.Add(entry);
+                }
+
+                if (batch.Count == 0)
+                    return;
+
+                // ✅ CORRIGIDO: Liberar semáforo ANTES de escrever
+                if (_blockingSemaphore != null)
+                {
+                    _blockingSemaphore.Release(batch.Count);
+                }
+
+                if (_sink is IBatchLogSink batchSink)
+                {
+                    try { batchSink.WriteBatch(batch); }
+                    catch { }
+                }
+                else
+                {
+                    foreach (var entry in batch)
+                    {
+                        try { _sink.Write(entry); }
+                        catch { }
+                    }
+                }
+            }
+        }        // ✅ NOVO: Flush assíncrono
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
             if (_disposed)
@@ -155,7 +252,12 @@ namespace CustomLogger.Buffering
                     if (batch.Count == 0)
                         return;
 
-                    // ✅ Usa async se disponível
+                    // ✅ Libera semáforo
+                    if (_blockingSemaphore != null)
+                    {
+                        _blockingSemaphore.Release(batch.Count);
+                    }
+
                     if (_sink is IAsyncBatchLogSink asyncBatchSink)
                     {
                         asyncBatchSink.WriteBatchAsync(batch, cancellationToken).GetAwaiter().GetResult();
@@ -182,6 +284,9 @@ namespace CustomLogger.Buffering
             }, cancellationToken);
         }
 
+        // ✅ NOVO: Métrica de logs descartados
+        public long GetDroppedLogsCount() => Interlocked.Read(ref _droppedLogsCount);
+
         public void Dispose()
         {
             if (_disposed)
@@ -189,14 +294,10 @@ namespace CustomLogger.Buffering
 
             _disposed = true;
 
-            Console.WriteLine($"[DEBUG] Dispose - Itens na fila: {_queue.Count}");
-
             _flushTimer?.Dispose();
-
-            Console.WriteLine("[DEBUG] Dispose - Chamando Flush final");
             Flush();
 
-            Console.WriteLine("[DEBUG] Dispose - Concluído");
+            _blockingSemaphore?.Dispose();
         }
     }
 }
