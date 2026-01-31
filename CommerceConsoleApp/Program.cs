@@ -19,102 +19,54 @@ IConfiguration config = builder.Build();
 string container = config["Azure:ContainerName"]!;
 string connectionString = config["Azure:ConnectionString"]!;
 
-//#region OriginalLogs
-//var options = new CustomProviderOptions
-//{
-//    UseGlobalBuffer = true,
-//    BatchOptions = new BatchOptions
-//    {
-//        BatchSize = 5,
-//        FlushInterval = TimeSpan.FromSeconds(5)
-//    }
-//};
-
-//var provider = new CustomLoggerProviderBuilder()
-//    .WithOptions(options)
-//    .AddConsoleSink()
-//    .AddFileSink("logs/app.log")
-//    .AddBlobSink(connectionString, container)
-//    .Build();
-
-//var loggerFactory = LoggerFactory.Create(builder =>
-//{
-//    builder.AddProvider(provider);
-//});
-
-//var logger = loggerFactory.CreateLogger("Test");
-
-
-//var activity = new Activity("CommerceConsoleAppActivity").Start();
-//var scopes = new Dictionary<string, object>
-//{
-//    ["traceId"] = activity.Context.TraceId.ToString(),
-//    ["spanId"] = activity.Context.SpanId.ToString()
-//};
-
-//using (logger.BeginScope(scopes))
-//{
-//    logger.LogInformation("CommerceConsoleApp iniciada com sucesso.");
-
-//    logger.LogTrace("This is a trace log, useful for debugging.");
-//    logger.LogDebug("This is a debug log, useful for development.");
-//    logger.LogInformation("This is an information log, useful for general information.");
-//    logger.LogWarning("This is a warning log, indicating a potential issue.");
-//    logger.LogError(new InvalidOperationException("Invalid Generic Operation"), "This is an error log, indicating a failure in the application.");
-//    logger.LogCritical("This is a critical log, indicating a severe failure.");
-//}
-
-//provider.Dispose();
-
-//activity.Stop();
-//Thread.Sleep(1000);
-
-//#endregion
-
+#region OriginalLogs
 var options = new CustomProviderOptions
 {
+    MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    BackpressureOptions = new BackpressureOptions
-    {
-        MaxQueueCapacity = 5,
-        OverflowStrategy = OverflowStrategy.DropOldest
-    },
     BatchOptions = new BatchOptions
     {
-        BatchSize = 100,  // Não vai fazer flush
-        FlushInterval = TimeSpan.Zero
+        BatchSize = 5,
+        FlushInterval = TimeSpan.FromSeconds(5)
     }
 };
 
+var provider = new CustomLoggerProviderBuilder()
+    .WithOptions(options)
+    .AddConsoleSink()
+    .AddFileSink("logs/app.log")
+    //.AddBlobSink(connectionString, container)
+    .Build();
 
-#region Teste 1
-var mockSink = new MockLogSink();
-var buffer = new InstanceLogBuffer(mockSink, options);
-
-// Enviar 10 logs (capacidade = 5)
-for (int i = 0; i < 10; i++)
+var loggerFactory = LoggerFactory.Create(builder =>
 {
-    buffer.Enqueue(new BufferedLogEntry(
-        DateTimeOffset.UtcNow,
-        "BackPressure",
-        LogLevel.Error,
-        new EventId(i, "DropOldest"),
-        $"{i} - DropOldest Test",
-        new InvalidOperationException(),
-        null,
-        null
-    ));
+    builder.AddProvider(provider);
+});
+
+var logger = loggerFactory.CreateLogger("Test");
+
+
+var activity = new Activity("CommerceConsoleAppActivity").Start();
+var scopes = new Dictionary<string, object>
+{
+    ["traceId"] = activity.Context.TraceId.ToString(),
+    ["spanId"] = activity.Context.SpanId.ToString()
+};
+
+using (logger.BeginScope(scopes))
+{
+    logger.LogTrace("This is a trace log, useful for debugging.");
+    logger.LogDebug("This is a debug log, useful for development.");
+    logger.LogInformation("This is an information log, useful for general information.");
+    logger.LogWarning("This is a warning log, indicating a potential issue.");
+    logger.LogError(new InvalidOperationException("Invalid Generic Operation"), "This is an error log, indicating a failure in the application.");
+    logger.LogCritical("This is a critical log, indicating a severe failure.");
 }
 
-buffer.Flush();
+provider.Dispose();
 
-// ✅ ESPERADO:
-// - Fila tem 5 logs (logs 5-9)
-// - Logs 0-4 foram descartados
-// - GetDroppedLogsCount() == 5
+activity.Stop();
+Thread.Sleep(1000);
 
-Assert.Equal(5, mockSink.WrittenEntries.Count);
-Assert.Equal("Log 5", mockSink.WrittenEntries[0].Message);
-Assert.Equal("Log 9", mockSink.WrittenEntries[4].Message);
-Assert.Equal(5, buffer.GetDroppedLogsCount());
 #endregion
+
