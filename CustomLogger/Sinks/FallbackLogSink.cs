@@ -6,28 +6,18 @@ using System.Text;
 
 namespace CustomLogger.Sinks
 {
-    public class FallbackLogSink : ILogSink
+    public sealed class FallbackLogSink : ILogSink
     {
-        public void WriteFallback(
-    BufferedLogEntry original,
-    Exception sinkException)
+        public void Write(ILogEntry entry)
         {
             try
             {
-                Console.Error.WriteLine(
-                    $"[LOGGING-FAILURE] {sinkException.Message}");
-                Console.Error.WriteLine(
-                    $"[ORIGINAL] {original.Message}");
+                Console.Error.WriteLine($"[FALLBACK] {entry?.Timestamp} {entry?.LogLevel} {entry?.Message}");
             }
             catch
             {
-                // Última linha de defesa: silêncio absoluto
+                // Silêncio absoluto - última linha de defesa
             }
-        }
-
-        public void Write(ILogEntry entry)
-        {
-            throw new NotImplementedException();
         }
     }
 }

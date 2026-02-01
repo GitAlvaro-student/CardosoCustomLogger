@@ -28,7 +28,5 @@ namespace CustomLogger.Configurations
         public int MaxBufferSize { get; set; } = 1000;
 
         public BatchOptions BatchOptions { get; set; } = new BatchOptions();
-
-        public BackpressureOptions BackpressureOptions { get; set; } = new BackpressureOptions();
     }
 }

@@ -70,4 +70,3 @@ activity.Stop();
 Thread.Sleep(1000);
 
 #endregion
-

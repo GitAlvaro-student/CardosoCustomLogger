@@ -7,7 +7,7 @@ namespace CustomLogger.Configurations
     public sealed class BatchOptions
     {
         public int BatchSize { get; set; } = 50;
-        public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(10);
+        public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(5);
     }
 
 }
