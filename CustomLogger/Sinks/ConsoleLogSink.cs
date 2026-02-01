@@ -90,15 +90,24 @@ namespace CustomLogger.Sinks
 
             try
             {
-                await Console.Out.WriteLineAsync(_formatter.Format(entry));
+                if (ConsoleColorManager.IsOutputToRealConsole())
+                {
+                    string formattedMessage = _formatter.Format(entry);
+                    await ConsoleColorManager.WriteColoredLineAsync(formattedMessage, entry.LogLevel, cancellationToken);
+                }
+                else
+                {
+                    // COMPATIBILIDADE: Comportamento original para output redirecionado
+                    await Console.Out.WriteLineAsync(_formatter.Format(entry));
+                }
             }
             catch
             {
-                // Absorve falha
+                // Absorve falha (mantido)
             }
         }
 
-        // ✅ NOVO: WriteBatch assíncrono
+        // ✅ MODIFICADO: WriteBatchAsync otimizado com cores
         public async Task WriteBatchAsync(IEnumerable<ILogEntry> entries, CancellationToken cancellationToken = default)
         {
             if (entries == null)
@@ -106,15 +115,36 @@ namespace CustomLogger.Sinks
 
             try
             {
-                foreach (var entry in entries)
+                if (ConsoleColorManager.IsOutputToRealConsole())
                 {
-                    await Console.Out.WriteLineAsync(_formatter.Format(entry));
+                    // ✅ OTIMIZAÇÃO: Pré-processa todas as entradas
+                    var coloredEntries = entries
+                        .Where(e => e != null)
+                        .Select(e => (Text: _formatter.Format(e), Level: e.LogLevel))
+                        .ToList();
+
+                    if (coloredEntries.Count > 0)
+                    {
+                        await ConsoleColorManager.WriteColoredBatchAsync(coloredEntries, cancellationToken);
+                        await Console.Out.FlushAsync();
+                    }
                 }
-                await Console.Out.FlushAsync();
+                else
+                {
+                    // COMPATIBILIDADE: Código original para output redirecionado
+                    foreach (var entry in entries)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        await Console.Out.WriteLineAsync(_formatter.Format(entry));
+                    }
+                    await Console.Out.FlushAsync();
+                }
             }
             catch
             {
-                // Absorve falha
+                // Absorve falha (mantido)
             }
         }
 
@@ -543,6 +573,70 @@ namespace CustomLogger.Sinks
                 }
             }
 
+
+            /// <summary>
+            /// Escreve linha colorida de forma assíncrona
+            /// IMPORTANTE: Restaura cor mesmo em caso de exceção
+            /// </summary>
+            public static async Task WriteColoredLineAsync(string text, LogLevel logLevel, CancellationToken cancellationToken = default)
+            {
+                if (string.IsNullOrEmpty(text))
+                {
+                    await Console.Out.WriteLineAsync();
+                    return;
+                }
+
+                var originalColor = Console.ForegroundColor;
+
+                try
+                {
+                    // 1. Aplica cor baseada no nível
+                    ApplyColor(logLevel);
+
+                    // 2. Escreve o texto assincronamente
+                    await Console.Out.WriteLineAsync(text);
+                }
+                finally
+                {
+                    // 3. Restaura cor original (GARANTIDO!)
+                    Console.ForegroundColor = originalColor;
+                }
+            }
+
+            /// <summary>
+            /// Versão otimizada para WriteBatchAsync
+            /// Aplica cor apenas se mudou desde a última entrada
+            /// </summary>
+            public static async Task WriteColoredBatchAsync(
+                IEnumerable<(string Text, LogLevel Level)> entries,
+                CancellationToken cancellationToken = default)
+            {
+                var originalColor = Console.ForegroundColor;
+                LogLevel? lastLevel = null;
+
+                try
+                {
+                    foreach (var (text, level) in entries)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        // ✅ OTIMIZAÇÃO: Só muda cor se necessário
+                        if (level != lastLevel)
+                        {
+                            ApplyColor(level);
+                            lastLevel = level;
+                        }
+
+                        await Console.Out.WriteLineAsync(text);
+                    }
+                }
+                finally
+                {
+                    // Restaura cor original
+                    Console.ForegroundColor = originalColor;
+                }
+            }
 
             /// <summary>
             /// Aplica a cor do console baseada no LogLevel
