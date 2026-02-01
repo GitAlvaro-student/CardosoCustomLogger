@@ -61,15 +61,13 @@ namespace CustomLogger.Buffering
             if (_disposed)
                 return;
 
-            // ✅ Evita flush concorrente
             lock (_flushLock)
             {
                 if (_queue.IsEmpty)
                     return;
 
-                // ✅ Captura snapshot da fila
                 var batch = new List<ILogEntry>();
-                while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
+                while (_queue.TryDequeue(out var entry))
                 {
                     batch.Add(entry);
                 }
@@ -77,36 +75,32 @@ namespace CustomLogger.Buffering
                 if (batch.Count == 0)
                     return;
 
-                // ✅ Escrita em lote se sink suportar
-                if (_sink is IBatchLogSink batchSink)
+                try
                 {
-                    try
+                    if (_sink is IBatchLogSink batchSink)
                     {
                         batchSink.WriteBatch(batch);
                     }
-                    catch
+                    else
                     {
-                        // Absorve falha
+                        foreach (var entry in batch)
+                        {
+                            try { _sink.Write(entry); }
+                            catch { }
+                        }
                     }
                 }
-                else
+                catch
                 {
-                    // ✅ Fallback: escrita individual
+                    // ✅ Fallback: tenta escrita individual se batch falhou
                     foreach (var entry in batch)
                     {
-                        try
-                        {
-                            _sink.Write(entry);
-                        }
-                        catch
-                        {
-                            // Absorve falha
-                        }
+                        try { _sink.Write(entry); }
+                        catch { }
                     }
                 }
             }
         }
-
         public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
         {
             if (_disposed || entry == null)
@@ -139,26 +133,32 @@ namespace CustomLogger.Buffering
             if (_disposed)
                 return;
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 lock (_flushLock)
                 {
                     if (_queue.IsEmpty)
                         return;
+                }
 
-                    var batch = new List<ILogEntry>();
-                    while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
+                List<ILogEntry> batch;
+                lock (_flushLock)
+                {
+                    batch = new List<ILogEntry>();
+                    while (_queue.TryDequeue(out var entry))
                     {
                         batch.Add(entry);
                     }
+                }
 
-                    if (batch.Count == 0)
-                        return;
+                if (batch.Count == 0)
+                    return;
 
-                    // ✅ Usa async se disponível
+                try
+                {
                     if (_sink is IAsyncBatchLogSink asyncBatchSink)
                     {
-                        asyncBatchSink.WriteBatchAsync(batch, cancellationToken).GetAwaiter().GetResult();
+                        await asyncBatchSink.WriteBatchAsync(batch, cancellationToken);
                     }
                     else if (_sink is IBatchLogSink batchSink)
                     {
@@ -168,20 +168,32 @@ namespace CustomLogger.Buffering
                     {
                         foreach (var entry in batch)
                         {
+                            try { _sink.Write(entry); }
+                            catch { }
+                        }
+                    }
+                }
+                catch
+                {
+                    // ✅ Fallback: tenta escrita individual se batch falhou
+                    foreach (var entry in batch)
+                    {
+                        try
+                        {
                             if (_sink is IAsyncLogSink asyncSink)
                             {
-                                asyncSink.WriteAsync(entry, cancellationToken).GetAwaiter().GetResult();
+                                await asyncSink.WriteAsync(entry, cancellationToken);
                             }
                             else
                             {
                                 _sink.Write(entry);
                             }
                         }
+                        catch { }
                     }
                 }
             }, cancellationToken);
         }
-
         public void Dispose()
         {
             if (_disposed)
