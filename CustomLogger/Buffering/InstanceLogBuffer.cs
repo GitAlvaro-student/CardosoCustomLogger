@@ -17,12 +17,22 @@ namespace CustomLogger.Buffering
         private readonly CustomProviderOptions _options;
         private readonly Timer _flushTimer;
         private readonly object _flushLock = new object();
+        private readonly SemaphoreSlim _blockingSemaphore;
         private bool _disposed;
+        private long _droppedLogsCount;
 
         public InstanceLogBuffer(ILogSink sink, CustomProviderOptions options)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _options = options ?? throw new ArgumentNullException(nameof(options));
+
+            if (_options.BackpressureOptions.OverflowStrategy == OverflowStrategy.Block)
+            {
+                _blockingSemaphore = new SemaphoreSlim(
+                    _options.BackpressureOptions.MaxQueueCapacity,
+                    _options.BackpressureOptions.MaxQueueCapacity
+                );
+            }
 
             // ✅ Timer para flush periódico
             if (_options.BatchOptions.FlushInterval > TimeSpan.Zero)
@@ -47,24 +57,35 @@ namespace CustomLogger.Buffering
                 return;
             }
 
-            _queue.Enqueue(entry);
+            // ✅ CORRIGIDO: Aguardar semáforo ANTES de enfileirar
+            if (!TryEnqueueWithBackpressure(entry))
+            {
+                return;
+            }
 
-            // ✅ Flush por tamanho (batch size)
             if (_queue.Count >= _options.BatchOptions.BatchSize)
             {
                 Flush();
             }
         }
 
-        public void Flush()
+        public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
         {
-            if (_disposed)
+            if (_disposed || entry == null)
                 return;
 
             lock (_flushLock)
             {
-                if (_queue.IsEmpty)
-                    return;
+                if (_sink is IAsyncLogSink asyncSink)
+                {
+                    await asyncSink.WriteAsync(entry, cancellationToken);
+                }
+                else
+                {
+                    _sink.Write(entry);  // ✅ Fallback síncrono
+                }
+                return;
+            }
 
                 var batch = new List<ILogEntry>();
                 while (_queue.TryDequeue(out var entry))
@@ -72,8 +93,7 @@ namespace CustomLogger.Buffering
                     batch.Add(entry);
                 }
 
-                if (batch.Count == 0)
-                    return;
+            //_queue.Enqueue(entry);
 
                 try
                 {
@@ -103,31 +123,44 @@ namespace CustomLogger.Buffering
         }
         public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
         {
-            if (_disposed || entry == null)
+            if (_disposed)
                 return;
 
-            if (!_options.UseGlobalBuffer)
+            lock (_flushLock)
             {
-                if (_sink is IAsyncLogSink asyncSink)
+                if (_queue.IsEmpty)
+                    return;
+
+                var batch = new List<ILogEntry>();
+                while (_queue.TryDequeue(out var entry) && batch.Count < _options.BatchOptions.BatchSize)
                 {
-                    await asyncSink.WriteAsync(entry, cancellationToken);
+                    batch.Add(entry);
+                }
+
+                if (batch.Count == 0)
+                    return;
+
+                // ✅ CORRIGIDO: Liberar semáforo ANTES de escrever
+                if (_blockingSemaphore != null)
+                {
+                    _blockingSemaphore.Release(batch.Count);
+                }
+
+                if (_sink is IBatchLogSink batchSink)
+                {
+                    try { batchSink.WriteBatch(batch); }
+                    catch { }
                 }
                 else
                 {
-                    _sink.Write(entry);  // ✅ Fallback síncrono
+                    foreach (var entry in batch)
+                    {
+                        try { _sink.Write(entry); }
+                        catch { }
+                    }
                 }
-                return;
             }
-
-            _queue.Enqueue(entry);
-
-            if (_queue.Count >= _options.BatchOptions.BatchSize)
-            {
-                await FlushAsync(cancellationToken);
-            }
-        }
-
-        // ✅ NOVO: Flush assíncrono
+        }        // ✅ NOVO: Flush assíncrono
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
             if (_disposed)
@@ -201,14 +234,10 @@ namespace CustomLogger.Buffering
 
             _disposed = true;
 
-            Console.WriteLine($"[DEBUG] Dispose - Itens na fila: {_queue.Count}");
-
             _flushTimer?.Dispose();
-
-            Console.WriteLine("[DEBUG] Dispose - Chamando Flush final");
             Flush();
 
-            Console.WriteLine("[DEBUG] Dispose - Concluído");
+            _blockingSemaphore?.Dispose();
         }
     }
 }
