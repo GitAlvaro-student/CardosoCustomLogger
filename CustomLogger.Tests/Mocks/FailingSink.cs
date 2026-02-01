@@ -1,9 +1,11 @@
 ﻿using CustomLogger.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace CustomLogger.Sinks
+namespace CustomLogger.Tests.Models
 {
     public sealed class FailingSink : ILogSink
     {
@@ -12,4 +14,5 @@ namespace CustomLogger.Sinks
             throw new Exception("Sink falhou");
         }
     }
+
 }

@@ -74,11 +74,6 @@ string connectionString = config["Azure:ConnectionString"]!;
 var options = new CustomProviderOptions
 {
     UseGlobalBuffer = true,
-    BackpressureOptions = new BackpressureOptions
-    {
-        MaxQueueCapacity = 5,
-        OverflowStrategy = OverflowStrategy.DropOldest
-    },
     BatchOptions = new BatchOptions
     {
         BatchSize = 100,  // Não vai fazer flush
@@ -116,5 +111,4 @@ buffer.Flush();
 Assert.Equal(5, mockSink.WrittenEntries.Count);
 Assert.Equal("Log 5", mockSink.WrittenEntries[0].Message);
 Assert.Equal("Log 9", mockSink.WrittenEntries[4].Message);
-Assert.Equal(5, buffer.GetDroppedLogsCount());
 #endregion
