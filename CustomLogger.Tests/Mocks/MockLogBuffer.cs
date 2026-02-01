@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CustomLogger.Tests.Mocks
 {
-    public sealed class MockLogBuffer : ILogBuffer
+    public sealed class MockLogBuffer : ILogBuffer, IAsyncLogBuffer
     {
         public List<ILogEntry> EnqueuedEntries { get; } = new();
 
@@ -16,9 +16,19 @@ namespace CustomLogger.Tests.Mocks
             EnqueuedEntries.Add(entry);
         }
 
+        public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
+        {
+            EnqueuedEntries.Add(entry);
+        }
+
         public void Flush()
         {
             // Não faz nada - apenas para satisfazer contrato
+        }
+
+        public Task FlushAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

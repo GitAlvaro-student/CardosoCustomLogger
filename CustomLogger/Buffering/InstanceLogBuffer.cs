@@ -43,7 +43,14 @@ namespace CustomLogger.Buffering
 
             if (!_options.UseGlobalBuffer)
             {
-                _sink.Write(entry);
+                try
+                {
+                    _sink.Write(entry);
+                }
+                catch
+                {
+
+                }
                 return;
             }
 
@@ -199,7 +206,6 @@ namespace CustomLogger.Buffering
             if (_disposed)
                 return;
 
-            _disposed = true;
 
             Console.WriteLine($"[DEBUG] Dispose - Itens na fila: {_queue.Count}");
 
@@ -209,6 +215,7 @@ namespace CustomLogger.Buffering
             Flush();
 
             Console.WriteLine("[DEBUG] Dispose - Concluído");
+            _disposed = true;
         }
     }
 }
