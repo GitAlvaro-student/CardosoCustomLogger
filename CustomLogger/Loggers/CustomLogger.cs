@@ -16,13 +16,13 @@ namespace CustomLogger.Loggers
     {
         private readonly string _categoryName;
         private readonly CustomProviderConfiguration _configuration;
-        private readonly ILogBuffer _buffer;
+        private readonly IAsyncLogBuffer _buffer;
         private readonly ILogScopeProvider _logScopeProvider;
 
         public CustomLogger(
             string categoryName,
             CustomProviderConfiguration configuration,
-            ILogBuffer buffer,
+            IAsyncLogBuffer buffer,
             ILogScopeProvider logScopeProvider)
         {
             _categoryName = categoryName
@@ -86,7 +86,7 @@ namespace CustomLogger.Loggers
                 _logScopeProvider.GetScopes()
             );
 
-            _buffer.Enqueue(entry);
+            _buffer.EnqueueAsync(entry);
 
 
             // Ponto de extensão:

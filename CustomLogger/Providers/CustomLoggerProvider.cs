@@ -18,7 +18,7 @@ namespace CustomLogger.Providers
     public sealed class CustomLoggerProvider : ILoggerProvider
     {
         private readonly CustomProviderConfiguration _configuration;
-        private readonly ILogBuffer _buffer;
+        private readonly IAsyncLogBuffer _buffer;
         private readonly List<IDisposable> _disposables = new List<IDisposable>();
         private bool _disposed;
 

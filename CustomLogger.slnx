@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/Examples/">
+    <Project Path="GamesAPI/GamesAPI.csproj" Id="f47d435c-6aaa-43c5-8fcc-d89a3319ad31" />
+    <Project Path="PaymentAPI/PaymentAPI.csproj" Id="4dc70fc2-1bd4-4eb5-b60a-66a2d22ea9f8" />
+  </Folder>
   <Project Path="CommerceConsoleApp/CommerceConsoleApp.csproj" />
   <Project Path="CustomLogger.Tests/CustomLogger.Tests.csproj" Id="fb43802b-87a0-4003-8c0c-5f2eb18c615a" />
   <Project Path="CustomLogger/CustomLogger.csproj" />
