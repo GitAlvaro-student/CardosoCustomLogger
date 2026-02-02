@@ -2,6 +2,7 @@
 using CustomLogger.Buffering;
 using CustomLogger.Configurations;
 using CustomLogger.Sinks;
+using CustomLogger.Tests.Mocks;
 using CustomLogger.Tests.Models;
 using Microsoft.Extensions.Logging;
 using Xunit;

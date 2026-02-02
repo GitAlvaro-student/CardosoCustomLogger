@@ -1,11 +1,6 @@
 ﻿using CustomLogger.Configurations;
 using CustomLogger.Tests.Mocks;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CustomLogger.Tests.PureUnits
 {

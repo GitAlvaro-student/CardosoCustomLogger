@@ -1,6 +1,6 @@
 ﻿using CustomLogger.Abstractions;
 
-namespace CustomLogger.Tests.Models
+namespace CustomLogger.Tests.Mocks
 {
     public sealed class MockLogSink : ILogSink, IBatchLogSink
     {
