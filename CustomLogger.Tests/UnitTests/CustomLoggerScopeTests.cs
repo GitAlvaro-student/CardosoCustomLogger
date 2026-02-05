@@ -2,7 +2,9 @@
 using CustomLogger.Scopes;
 using CustomLogger.Tests.Mocks;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace CustomLogger.Tests.PureUnits
 {

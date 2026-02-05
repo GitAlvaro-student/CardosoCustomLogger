@@ -1,4 +1,5 @@
 ﻿using CustomLogger.Abstractions;
+using System.Collections.Generic;
 
 namespace CustomLogger.Tests.Mocks
 {

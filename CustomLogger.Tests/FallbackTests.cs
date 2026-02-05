@@ -5,6 +5,7 @@ using CustomLogger.Sinks;
 using CustomLogger.Tests.Mocks;
 using CustomLogger.Tests.Models;
 using Microsoft.Extensions.Logging;
+using System;
 using Xunit;
 
 namespace CustomLogger.Tests
