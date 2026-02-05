@@ -2,8 +2,11 @@
 using CustomLogger.Buffering;
 using CustomLogger.Configurations;
 using CustomLogger.Sinks;
+using CustomLogger.Tests.Mocks;
 using CustomLogger.Tests.Models;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
 
 namespace CustomLogger.Tests
 {
@@ -14,7 +17,7 @@ namespace CustomLogger.Tests
         {
             // ARRANGE
             var failingSink = new FailingSink();
-            var mockSink = new Models.MockLogSink();
+            var mockSink = new MockLogSink();
 
             var composite = new CompositeLogSink(
                 new ILogSink[] { failingSink, mockSink }

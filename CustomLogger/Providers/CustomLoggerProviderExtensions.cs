@@ -1,4 +1,5 @@
 ﻿using CustomLogger.Configurations;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -76,6 +77,78 @@ namespace CustomLogger.Providers
             {
                 builder.AddProvider(provider);
             });
+        }
+
+        public static ILoggingBuilder AddCustomLogging(
+        this ILoggingBuilder builder,
+        IConfiguration configuration)
+        {
+            var section = configuration.GetSection("CustomLogger");
+
+            var config = section.Get<CustomLoggerConfiguration>();
+            if (config is null)
+                return builder;
+
+            builder.AddCustomLogging(
+                options => ApplyOptions(options, config),
+                sinks => ApplySinks(sinks, config, configuration)
+            );
+
+            return builder;
+        }
+
+        private static void ApplyOptions(
+        CustomProviderOptions options,
+        CustomLoggerConfiguration config)
+        {
+            if (Enum.TryParse<LogLevel>(
+                config.MinimumLogLevel,
+                ignoreCase: true,
+                out var level))
+            {
+                options.MinimumLogLevel = level;
+            }
+
+            if (config.Buffer != null && config.Buffer.Enabled)
+            {
+                options.UseGlobalBuffer = true;
+                options.MaxBufferSize = config.Buffer.MaxSize;
+                options.BatchOptions = new BatchOptions
+                {
+                    BatchSize = 30,
+                    FlushInterval = TimeSpan.FromSeconds(5)
+                };
+            }
+        }
+
+        private static void ApplySinks(
+            CustomLoggerProviderBuilder builder,
+            CustomLoggerConfiguration config,
+            IConfiguration rootConfig)
+        {
+            var sinks = config.Sinks;
+            if (sinks is null)
+                return;
+
+            if (sinks.Console?.Enabled == true)
+            {
+                builder.AddConsoleSink();
+            }
+
+            if (sinks.File?.Enabled == true &&
+                !string.IsNullOrWhiteSpace(sinks.File.Path))
+            {
+                builder.AddFileSink(sinks.File.Path);
+            }
+
+            if (sinks.BlobStorage?.Enabled == true && (
+                    !string.IsNullOrWhiteSpace(sinks.BlobStorage.ConnectionString) && 
+                    !string.IsNullOrWhiteSpace(sinks.BlobStorage.ContainerName)))
+            {
+                builder.AddBlobSink(sinks.BlobStorage.ConnectionString, sinks.BlobStorage.ContainerName);
+            }
+
+
         }
     }
 }

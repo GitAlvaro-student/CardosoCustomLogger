@@ -4,6 +4,7 @@ using CustomLogger.Configurations;
 using CustomLogger.Sinks;
 using CustomLogger.Tests.Models;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace CustomLogger.Tests
 {

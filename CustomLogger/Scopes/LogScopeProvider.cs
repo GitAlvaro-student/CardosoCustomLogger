@@ -38,7 +38,9 @@ namespace CustomLogger.Scopes
 
             if (_scopes.Value == null || _scopes.Value.Count == 0)
                 return result;
-
+            
+            // Para escopos genéricos, precisamos manter contador único
+            int genericScopeIndex = 0;
             // ✅ REGRA: Scope mais INTERNO prevalece (último empilhado)
             // Itera do topo da pilha para a base
             foreach (var scope in _scopes.Value)
@@ -57,12 +59,14 @@ namespace CustomLogger.Scopes
                 }
                 else
                 {
-                    // ✅ Scope genérico: usa índice sequencial
-                    var key = $"scope_{_scopes.Value.Count - 1}";
+                    // ✅ Scope genérico: usa índice único baseado na posição na iteração
+                    // Chave única para cada escopo genérico
+                    var key = $"scope_{genericScopeIndex}";
                     if (!result.ContainsKey(key))
                     {
                         result[key] = scope;
                     }
+                    genericScopeIndex++;
                 }
             }
 

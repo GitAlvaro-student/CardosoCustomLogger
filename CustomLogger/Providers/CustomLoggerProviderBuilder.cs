@@ -19,6 +19,22 @@ namespace CustomLogger.Providers
             return this;
         }
 
+        // ✅ Método que aceita lambda para configuração
+        public CustomLoggerProviderBuilder WithOptions(Action<CustomProviderOptions> configure)
+        {
+            _options = _options != null ? _options : new CustomProviderOptions();
+            configure?.Invoke(_options);
+            return this;
+        }
+
+        // CustomLoggerProviderBuilder.cs
+        public CustomLoggerProviderBuilder AddSink(ILogSink sink)
+        {
+            if (sink != null)
+                _sinks.Add(sink);
+            return this;
+        }
+
         public CustomLoggerProviderBuilder AddConsoleSink(ILogFormatter formatter = null)
         {
             _sinks.Add(new ConsoleLogSink(formatter ?? new JsonLogFormatter()));
