@@ -27,10 +27,14 @@ namespace GamesAPI.Controllers
             {
                 _logger.LogDebug(GameEventIds.ConsultarTodos,
                     "Iniciando consulta de todos os jogos");
+                _logger.LogInformation(GameEventIds.ConsultarTodos,
+                    "Iniciando consulta de todos os jogos");
 
                 var jogos = _jogoService.ObterTodos();
 
                 _logger.LogInformation(GameEventIds.ConsultarTodos,
+                    "Consulta retornou {QuantidadeJogos} jogos", jogos.Count);
+                _logger.LogError(GameEventIds.ConsultarTodos,
                     "Consulta retornou {QuantidadeJogos} jogos", jogos.Count);
 
                 return Ok(jogos);
