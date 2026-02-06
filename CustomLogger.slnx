@@ -4,6 +4,8 @@
     <Project Path="PaymentAPI/PaymentAPI.csproj" Id="4dc70fc2-1bd4-4eb5-b60a-66a2d22ea9f8" />
   </Folder>
   <Folder Name="/MDs/">
+    <File Path="../../../../../Downloads/FLUSH_IMPLEMENTATION.md" />
+    <File Path="../../../../../Downloads/STARTUP_SHUTDOWN_DISPOSE_IMPLEMENTATION.md" />
     <File Path="../../../../Downloads/LIFECYCLE_GOVERNANCE.md" />
     <File Path="../../../../Downloads/rfc_core_de_logging.md" />
     <File Path="../../../../Downloads/STARTUP_SHUTDOWN_DISPOSE_CONTRACTS.md" />

@@ -1010,3 +1010,24 @@ public void Should_Capture_Nested_Scopes()
 **Última atualização:** Janeiro 2026  
 **Autor da Análise:** Claude (Anthropic)  
 **Projeto:** CardosoCustomLogger
+
+
+A ordem correta daqui pra frente:
+
+Consolidar os 3 documentos como RFC do Core
+
+Criar checklist de invariantes testáveis
+
+Começar implementação:
+
+estado + guard rails
+
+startup/shutdown/dispose
+
+flush
+
+fallback
+
+degradação
+
+Testes antes de otimização

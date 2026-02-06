@@ -87,65 +87,105 @@ namespace CustomLogger.Providers
         /// RFC: Síncrono - não aguarda operações async.
         /// RFC: Best-effort - absorve exceções de sinks.
         /// RFC: Única forma de iniciar shutdown.
-        /// RFC: Sequência obrigatória: STOPPING → Timer.Dispose → DISPOSING → Flush → DISPOSED → Sinks.Dispose
+        /// RFC: Sequência obrigatória:
+        ///   1. STOPPING
+        ///   2. Flush final
+        ///   3. DISPOSING
+        ///   4. Parar timer
+        ///   5. DISPOSED
+        ///   6. Dispose sinks
         /// </summary>
         public void Dispose()
         {
-            // GUARD RAIL #2: Tentar transitar para STOPPING
+            // ========================================================================
+            // GUARD RAIL: Garantir idempotência e thread-safety
+            // ========================================================================
+
             // RFC: Apenas PRIMEIRA thread que chamar Dispose() deve executar shutdown
             // RFC: Chamadas subsequentes retornam imediatamente (idempotência)
             bool shouldShutdown = _lifecycle.TryTransitionToStopping();
 
             if (!shouldShutdown)
             {
-                // RFC: Dispose() já foi chamado por outra thread, retorna silenciosamente
+                // RFC: Dispose() já foi chamado por outra thread ou já está em shutdown
+                // Idempotência: retorna silenciosamente, sem fazer nada
                 return;
             }
 
+            // ========================================================================
             // ESTADO: STOPPING
+            // ========================================================================
             // RFC: A partir daqui, novos logs são rejeitados silenciosamente
             // RFC: CreateLogger() lançará ObjectDisposedException
+            // RFC: Logs JÁ enfileirados serão processados no flush final
 
             try
             {
-                // PASSO 1: Parar timer de flush periódico
-                // RFC: Timer deve ser parado ANTES do flush final
-                // Justificativa: Evita race condition (timer chamando Flush durante Dispose)
-                if (_buffer is IDisposable disposableBuffer)
-                {
-                    // InstanceLogBuffer.Dispose() para o timer internamente
-                    // Nota: Aqui apenas paramos o timer, NÃO fazemos flush ainda
-                    // O flush será feito explicitamente no próximo passo
-
-                    // IMPORTANTE: Este Dispose do buffer NÃO deve fazer flush
-                    // Buffer deve ter lógica separada: timer.Dispose() vs Flush()
-                    // Por ora, assumindo que buffer tem método para parar timer sem flush
-                    // (Se não tiver, é um BLOQUEIO - ver final do arquivo)
-                    disposableBuffer.Dispose();
-                }
-
-                // PASSO 2: Transitar para DISPOSING
-                // RFC: STOPPING → DISPOSING ocorre antes do flush final
-                _lifecycle.TransitionToDisposing();
-
-                // ESTADO: DISPOSING
-                // RFC: Flush final deve acontecer APÓS timer parado
-
-                // PASSO 3: Flush final
+                // ====================================================================
+                // PASSO 1: FLUSH FINAL (enquanto buffer ainda está operacional)
+                // ====================================================================
                 // RFC: Drena TODOS os logs enfileirados até momento do STOPPING
                 // RFC: Flush final é síncrono e best-effort
+                // 
+                // CRÍTICO: Flush ANTES de Buffer.Dispose() (resolve bloqueio #1)
+                // Razão: Buffer.Flush() verifica se está disposed e retorna silenciosamente
+                // Se chamarmos Buffer.Dispose() primeiro, flush não executará
+                //
+                // Justificativa: Buffer ainda não está disposed, então Flush() executará normalmente
                 _buffer.Flush();
 
+                // ====================================================================
+                // PASSO 2: Transitar para DISPOSING
+                // ====================================================================
+                // RFC: STOPPING → DISPOSING ocorre APÓS flush final
+                // Garante que não há mais logs pendentes antes de liberar recursos
+                _lifecycle.TransitionToDisposing();
+
+                // ====================================================================
+                // ESTADO: DISPOSING
+                // ====================================================================
+                // RFC: Flush já foi executado, recursos podem ser liberados agora
+
+                // ====================================================================
+                // PASSO 3: Parar timer de flush periódico
+                // ====================================================================
+                // RFC: Timer deve ser parado APÓS flush final
+                // Justificativa: Timer já não é necessário (flush final já foi feito)
+                //
+                // Buffer.Dispose() para o timer internamente
+                // Não faz flush (flush já foi feito no passo 1)
+                if (_buffer is IDisposable disposableBuffer)
+                {
+                    try
+                    {
+                        disposableBuffer.Dispose();
+                    }
+                    catch
+                    {
+                        // RFC: Best-effort - absorve exceção de dispose de buffer
+                        // Justificativa: Timer pode já estar disposed ou falhar, não é crítico
+                    }
+                }
+
+                // ====================================================================
                 // PASSO 4: Transitar para DISPOSED
-                // RFC: Após flush final, antes de liberar sinks
+                // ====================================================================
+                // RFC: DISPOSING → DISPOSED ocorre após recursos internos liberados
+                // Garante que estado está correto antes de dispose de sinks
                 _lifecycle.TransitionToDisposed();
 
+                // ====================================================================
                 // ESTADO: DISPOSED
-                // RFC: Recursos podem ser liberados agora
+                // ====================================================================
+                // RFC: Core está completamente inutilizável agora
+                // RFC: Sinks podem ser liberados por último
 
+                // ====================================================================
                 // PASSO 5: Dispose dos sinks
+                // ====================================================================
                 // RFC: Sinks são liberados POR ÚLTIMO (após receberem todos os logs)
                 // RFC: Exceções de sinks são absorvidas (best-effort)
+                // RFC: Isolamento: falha em um sink não impede dispose de outros
                 foreach (var disposable in _disposables)
                 {
                     try
@@ -156,15 +196,29 @@ namespace CustomLogger.Providers
                     {
                         // RFC: Absorve TODAS as exceções de dispose de sinks
                         // Justificativa: Falha em um sink não deve impedir dispose de outros
+                        // Best-effort: tentamos liberar todos, mesmo que alguns falhem
                     }
                 }
             }
             catch
             {
+                // ====================================================================
+                // DEFESA EM PROFUNDIDADE
+                // ====================================================================
                 // RFC: Dispose() NUNCA lança exceções
-                // Absorve qualquer exceção não-tratada (defesa em profundidade)
-                // Em produção, isto não deve acontecer (todas as exceções já estão tratadas)
+                // RFC: Best-effort - tenta completar shutdown mesmo com erros
+                //
+                // Absorve qualquer exceção não-tratada nos passos acima
+                // Em produção, isto não deveria acontecer (todas as exceções já estão tratadas)
+                // Mas protege contra bugs ou condições inesperadas
             }
+
+            // ========================================================================
+            // SHUTDOWN COMPLETO
+            // ========================================================================
+            // Estado final: DISPOSED
+            // Todos os recursos liberados (best-effort)
+            // Provider está completamente inutilizável
         }
     }
 }

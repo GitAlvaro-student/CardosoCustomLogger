@@ -150,42 +150,180 @@ namespace CustomLogger.Buffering
         /// <summary>
         /// Processa todos os logs enfileirados.
         /// 
-        /// RFC: Flush explícito retorna silenciosamente se disposed.
-        /// RFC: Flush implícito (do Dispose) sempre executa.
+        /// RFC: Flush final (do Dispose) sempre executa enquanto buffer não está disposed.
+        /// RFC: Provider garante que flush é chamado ANTES de Buffer.Dispose().
         /// 
         /// IMPORTANTE: Implementação STUB - apenas estrutura de guard rails.
         /// Lógica completa de flush, fallback e isolamento de sinks NÃO implementada.
         /// </summary>
         public void Flush()
         {
-            // GUARD RAIL: Verificar se disposed
-            // NOTA: Provider gerencia quando flush pode ocorrer via ProviderLifecycleManager.CanFlush()
-            // Buffer faz verificação defensiva adicional
+            // ====================================================================
+            // GUARD RAIL: Verificar se buffer está disposed
+            // ====================================================================
+            // RFC: Flush retorna silenciosamente se buffer já está disposed
+            // 
+            // IMPORTANTE: Provider chama Flush ANTES de Buffer.Dispose()
+            // Então em shutdown normal, flush sempre executará
+            // Esta verificação protege contra chamadas externas após dispose
             if (IsDisposed())
             {
-                // EXCEÇÃO: Flush chamado pelo Dispose do Provider DEVE executar
-                // Como saber se é flush implícito vs explícito?
-                // BLOQUEIO IDENTIFICADO - ver final do arquivo
-                return; // Por ora, retorna silenciosamente
+                return; // Retorna silenciosamente
             }
 
+            // ====================================================================
+            // FLUSH: Processar fila
+            // ====================================================================
+            // RFC: Lock garante que apenas uma thread processa flush por vez
+            // Justificativa: Evita processar mesma fila simultaneamente
             lock (_flushLock)
             {
-                // STUB: Lógica real de flush não implementada
-                // Apenas drena a fila sem processar
-
+                // RFC: Retorna se fila está vazia (nada para processar)
                 if (_queue.IsEmpty)
                     return;
 
+                // ================================================================
+                // DRENAGEM DA FILA
+                // ================================================================
+                // RFC: Drena TODOS os logs da fila no momento do lock
+                // Logs adicionados APÓS este ponto vão para próximo flush
                 var batch = new List<ILogEntry>();
                 while (_queue.TryDequeue(out var entry))
                 {
                     batch.Add(entry);
                 }
 
-                // TODO: Processar batch com isolamento de sinks, fallback, etc.
-                // Por ora, apenas stub
+                // Segurança: Dupla verificação
+                if (batch.Count == 0)
+                    return;
+
+                // ================================================================
+                // PROCESSAMENTO DO BATCH
+                // ================================================================
+                // RFC: Flush tenta processar todos os logs drenados
+                // RFC: Flush NUNCA lança exceções
+                // RFC: Falha de sink não afeta outros sinks
+
+                ProcessBatch(batch);
             }
+        }
+
+        /// <summary>
+        /// Processa batch de logs enviando para sink.
+        /// 
+        /// RFC: Tentativa primária é WriteBatch (se suportado).
+        /// RFC: Falha em WriteBatch gera fallback automático para escrita individual.
+        /// RFC: TODAS as exceções são capturadas e absorvidas.
+        /// RFC: Nenhuma exceção pode sair do flush.
+        /// </summary>
+        /// <param name="batch">Batch de logs a processar</param>
+        private void ProcessBatch(List<ILogEntry> batch)
+        {
+            // ====================================================================
+            // ESTRATÉGIA 1: Tentar WriteBatch (se sink suportar)
+            // ====================================================================
+            // RFC: Se sink implementa IBatchLogSink, usar WriteBatch como tentativa primária
+            // RFC: WriteBatch é mais eficiente (uma chamada vs N chamadas)
+
+            if (_sink is IBatchLogSink batchSink)
+            {
+                try
+                {
+                    // ============================================================
+                    // TENTATIVA: WriteBatch
+                    // ============================================================
+                    // RFC: Tentar escrever batch completo em uma única operação
+                    // Se suceder, retornar (processamento completo)
+                    batchSink.WriteBatch(batch);
+                    return; // Sucesso - batch processado completamente
+                }
+                catch
+                {
+                    // ============================================================
+                    // FALLBACK: Batch → Individual
+                    // ============================================================
+                    // RFC: Falha em WriteBatch gera fallback automático
+                    // RFC: Tentamos escrita individual para cada log
+                    // Razão: Batch pode falhar por timeout de transação,
+                    //        mas escritas individuais podem ter sucesso parcial
+                    //
+                    // IMPORTANTE: Não fazemos 'throw' aqui
+                    // Continuamos para ProcessIndividualLogs abaixo
+                }
+            }
+
+            // ====================================================================
+            // ESTRATÉGIA 2: Escrita Individual
+            // ====================================================================
+            // RFC: Se sink NÃO suporta batch, ir direto para escrita individual
+            // RFC: Se WriteBatch falhou acima, fallback para escrita individual
+            // RFC: Cada log é tentado UMA vez
+            // RFC: Falha em um log NÃO impede tentativa dos demais
+
+            ProcessIndividualLogs(batch);
+        }
+
+        /// <summary>
+        /// Processa logs individualmente, um por vez.
+        /// 
+        /// RFC: Escrita individual é tentada UMA vez por log.
+        /// RFC: Falha em um log NÃO impede processamento dos demais.
+        /// RFC: TODAS as exceções são capturadas e absorvidas.
+        /// </summary>
+        /// <param name="batch">Batch de logs a processar individualmente</param>
+        private void ProcessIndividualLogs(List<ILogEntry> batch)
+        {
+            // ====================================================================
+            // PROCESSAMENTO LOG POR LOG
+            // ====================================================================
+            // RFC: Itera por TODOS os logs, mesmo que alguns falhem
+            // RFC: Isolamento total: falha em um log não afeta os demais
+
+            foreach (var entry in batch)
+            {
+                try
+                {
+                    // ============================================================
+                    // TENTATIVA: Write individual
+                    // ============================================================
+                    // RFC: Cada log é tentado exatamente UMA vez
+                    // RFC: Nenhum retry adicional é permitido
+                    // RFC: Se falhar, log é perdido (trade-off aceitável)
+
+                    _sink.Write(entry);
+
+                    // Se chegou aqui, log foi escrito com sucesso
+                    // Continua para próximo log
+                }
+                catch
+                {
+                    // ============================================================
+                    // ABSORÇÃO DE EXCEÇÕES
+                    // ============================================================
+                    // RFC: TODAS as exceções devem ser capturadas
+                    // RFC: Nenhuma exceção pode sair do flush
+                    // RFC: Flush NUNCA lança exceções
+                    //
+                    // Exceções possíveis:
+                    // - IOException (disco cheio, permissões)
+                    // - TimeoutException (sink remoto lento)
+                    // - NetworkException (rede indisponível)
+                    // - NullReferenceException (sink mal-implementado)
+                    // - Qualquer outra exceção
+                    //
+                    // Comportamento: Log é silenciosamente descartado
+                    // Trade-off: Melhor perder um log que derrubar aplicação
+                    //
+                    // Próximo log será tentado normalmente (isolamento)
+                }
+            }
+
+            // ====================================================================
+            // PROCESSAMENTO COMPLETO
+            // ====================================================================
+            // RFC: Mesmo que TODOS os logs tenham falhado, flush completa normalmente
+            // RFC: Flush nunca lança exceções, mesmo em caso de falha total
+            // Best-effort: Tentamos processar todos, mas não garantimos sucesso
         }
 
         /// <summary>
@@ -193,30 +331,51 @@ namespace CustomLogger.Buffering
         /// 
         /// RFC: Dispose() síncrono NÃO aguarda FlushAsync().
         /// RFC: FlushAsync em andamento pode ser abandonado durante shutdown.
+        /// 
+        /// IMPORTANTE: FlushAsync usa mesma lógica que Flush() síncrono.
+        /// Diferença: Pode ser cancelado via CancellationToken.
         /// </summary>
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
-            // GUARD RAIL: Idêntico a Flush()
+            // ====================================================================
+            // GUARD RAIL: Verificar se buffer está disposed
+            // ====================================================================
             if (IsDisposed())
             {
                 return; // Retorna silenciosamente
             }
 
+            // ====================================================================
+            // FLUSH ASSÍNCRONO
+            // ====================================================================
+            // RFC: FlushAsync pode ser abandonado durante Dispose()
+            // RFC: Dispose() é síncrono e NÃO aguarda FlushAsync em andamento
+            // 
+            // Task.Run permite cancelamento via CancellationToken
+            // Se cancelado, OperationCanceledException é absorvida no caller
+
             await Task.Run(() =>
             {
+                // ================================================================
+                // FLUSH: Processar fila (idêntico a Flush síncrono)
+                // ================================================================
                 lock (_flushLock)
                 {
-                    // STUB: Lógica real de flush assíncrono não implementada
                     if (_queue.IsEmpty)
                         return;
 
+                    // Drena fila completa
                     var batch = new List<ILogEntry>();
                     while (_queue.TryDequeue(out var entry))
                     {
                         batch.Add(entry);
                     }
 
-                    // TODO: Processar batch de forma assíncrona
+                    if (batch.Count == 0)
+                        return;
+
+                    // Processa batch (mesma lógica que Flush síncrono)
+                    ProcessBatch(batch);
                 }
             }, cancellationToken);
         }
@@ -225,33 +384,59 @@ namespace CustomLogger.Buffering
         /// Libera recursos do buffer.
         /// 
         /// RFC: Idempotente.
-        /// RFC: Para timer ANTES de flush final.
-        /// RFC: Flush final deve ser chamado EXTERNAMENTE pelo Provider.
+        /// RFC: Para timer (se existir).
+        /// RFC: NÃO faz flush - Provider chama Flush() explicitamente ANTES de Dispose().
         /// </summary>
         public void Dispose()
         {
+            // ====================================================================
             // GUARD RAIL: Idempotência
+            // ====================================================================
+            // RFC: Múltiplas chamadas a Dispose() são seguras
             // Usa Interlocked.CompareExchange para thread-safety
             int wasDisposed = Interlocked.CompareExchange(ref _isDisposed, 1, 0);
 
             if (wasDisposed == 1)
             {
-                // Já foi disposed, retorna silenciosamente
+                // Já foi disposed, retorna silenciosamente (idempotência)
                 return;
             }
 
-            // Agora estamos disposed (_isDisposed = 1)
+            // ====================================================================
+            // ESTADO: Disposed (_isDisposed = 1)
+            // ====================================================================
+            // A partir daqui, Enqueue() rejeitará novos logs silenciosamente
+            // Flush() retornará silenciosamente se chamado
 
-            // PASSO 1: Parar timer
-            // RFC: Timer deve ser parado ANTES do flush final
-            // RFC: Flush final será chamado pelo Provider, NÃO aqui
+            // ====================================================================
+            // PASSO 1: Parar timer de flush periódico
+            // ====================================================================
+            // RFC: Timer deve ser parado para evitar flush automático
+            // RFC: Provider já chamou Flush() antes deste Dispose()
+            //
+            // Justificativa: Timer em background pode causar race condition
+            // Dispose do timer é best-effort (absorve exceções)
             _flushTimer?.Dispose();
 
-            // RFC: Buffer.Dispose() NÃO deve fazer flush
-            // Flush final é responsabilidade do Provider (chamado explicitamente após timer parado)
+            // ====================================================================
+            // IMPORTANTE: NÃO fazer flush aqui
+            // ====================================================================
+            // RFC: Provider já chamou buffer.Flush() ANTES de buffer.Dispose()
+            // Se fizermos flush aqui, será flush duplicado ou flush vazio
+            //
+            // Sequência correta (executada pelo Provider):
+            //   1. buffer.Flush()    ← Drena logs pendentes
+            //   2. buffer.Dispose()  ← Para timer (estamos aqui)
+            //
+            // Fila pode conter logs ainda? NÃO - Provider chamou Flush() antes
+            // Se contiver, são logs de race condition (aceitável)
 
-            // Recursos liberados
-            // Fila permanece com logs pendentes (serão processados pelo Provider via Flush explícito)
+            // ====================================================================
+            // RECURSOS LIBERADOS
+            // ====================================================================
+            // Timer: disposed
+            // Fila: permanece alocada mas inacessível (será GC'ed)
+            // Sink: Provider é responsável por dispose de sinks
         }
 
         /// <summary>

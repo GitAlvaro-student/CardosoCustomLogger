@@ -34,7 +34,7 @@ var options = new CustomProviderOptions
 var provider = new CustomLoggerProviderBuilder()
     .WithOptions(options)
     .AddConsoleSink()
-    .AddFileSink("logs/app.log")
+    .AddFileSink("C:/logs/Commerce/app.log")
     //.AddBlobSink(connectionString, container)
     .Build();
 
