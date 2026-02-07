@@ -8,12 +8,59 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CustomLogger.Tests.IntegrationTests
 {
     public sealed class PipelineTests
     {
+        // ═══════════════════════════════════════════════════════════════
+        // HELPER METHODS - Compatibilidade entre .NET Framework e .NET 8
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Lê arquivo com retry para contornar file locking em .NET Framework.
+        /// </summary>
+        private static string LerArquivoComRetry(string path, int maxRetries = 3, int delayMs = 50)
+        {
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        return reader.ReadToEnd();
+                    }
+                }
+                catch (IOException) when (i < maxRetries - 1)
+                {
+                    Thread.Sleep(delayMs);
+                }
+            }
+            throw new IOException($"Não foi possível ler arquivo após {maxRetries} tentativas");
+        }
+
+        /// <summary>
+        /// Parseia primeira linha JSON de arquivo NDJSON (uma linha por log).
+        /// </summary>
+        private static System.Text.Json.JsonDocument ParsearPrimeiraLinhaJSON(string path)
+        {
+            var content = LerArquivoComRetry(path);
+
+            if (string.IsNullOrWhiteSpace(content))
+                throw new InvalidOperationException($"Arquivo vazio: {path}");
+
+            var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .ToArray();
+
+            if (lines.Length == 0)
+                throw new InvalidOperationException($"Nenhuma linha JSON válida em: {path}");
+
+            return System.Text.Json.JsonDocument.Parse(lines[0]);
+        }
         // ────────────────────────────────────────
         // Log simples chega ao destino
         // ────────────────────────────────────────
@@ -511,16 +558,16 @@ namespace CustomLogger.Tests.IntegrationTests
 
                 provider.Dispose();
 
-                // Verificar arquivo
-                var content = File.ReadAllText(path);
-                var doc = System.Text.Json.JsonDocument.Parse(content.Trim());
-                var root = doc.RootElement;
+                using (var doc = ParsearPrimeiraLinhaJSON(path))
+                {
+                    var root = doc.RootElement;
 
-                Assert.Equal("Warning", root.GetProperty("level").GetString());
-                Assert.Equal("PipelineTest", root.GetProperty("category").GetString());
-                Assert.Equal("Teste completo", root.GetProperty("message").GetString());
-                Assert.NotEqual(System.Text.Json.JsonValueKind.Null, root.GetProperty("exception").ValueKind);
-                Assert.Equal("xyz-789", root.GetProperty("scopes").GetProperty("RequestId").GetString());
+                    Assert.Equal("Warning", root.GetProperty("level").GetString());
+                    Assert.Equal("PipelineTest", root.GetProperty("category").GetString());
+                    Assert.Equal("Teste completo", root.GetProperty("message").GetString());
+                    Assert.NotEqual(System.Text.Json.JsonValueKind.Null, root.GetProperty("exception").ValueKind);
+                    Assert.Equal("xyz-789", root.GetProperty("scopes").GetProperty("RequestId").GetString());
+                }
             }
             finally
             {
