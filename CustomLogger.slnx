@@ -5,7 +5,8 @@
   </Folder>
   <Folder Name="/MDs/">
     <File Path="../../../../../Downloads/FLUSH_IMPLEMENTATION.md" />
-    <File Path="../../../../../Downloads/STARTUP_SHUTDOWN_DISPOSE_IMPLEMENTATION.md" />
+    <File Path="../../../../../Downloads/STEP_9_DEGRADED_MODE_DOCUMENTATION.md" />
+    <File Path="../../../../../Downloads/STEP_9_STARTUP_SHUTDOWN_DISPOSE_IMPLEMENTATION.md" />
     <File Path="../../../../Downloads/LIFECYCLE_GOVERNANCE.md" />
     <File Path="../../../../Downloads/rfc_core_de_logging.md" />
     <File Path="../../../../Downloads/STARTUP_SHUTDOWN_DISPOSE_CONTRACTS.md" />

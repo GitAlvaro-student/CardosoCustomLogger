@@ -31,10 +31,13 @@ var options = new CustomProviderOptions
     }
 };
 
+var blobSink = new BlobStorageLogSink(connectionString, container, null);
+
 var provider = new CustomLoggerProviderBuilder()
     .WithOptions(options)
     .AddConsoleSink()
     .AddFileSink("C:/logs/Commerce/app.log")
+    .AddSinkWithDegradation(blobSink)
     //.AddBlobSink(connectionString, container)
     .Build();
 
