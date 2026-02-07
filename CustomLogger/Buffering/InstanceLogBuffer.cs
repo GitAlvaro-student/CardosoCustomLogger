@@ -70,7 +70,7 @@ namespace CustomLogger.Buffering
             // Se chegou aqui, Provider permitiu (estado é OPERATIONAL)
 
             // Modo sem buffer: escreve diretamente no sink
-            if (!_options.UseGlobalBuffer)
+            if ((bool)!_options.UseGlobalBuffer)
             {
                 try
                 {
@@ -109,7 +109,7 @@ namespace CustomLogger.Buffering
             }
 
             // Modo sem buffer: escreve diretamente
-            if (!_options.UseGlobalBuffer)
+            if ((bool)!_options.UseGlobalBuffer)
             {
                 if (_sink is IAsyncLogSink asyncSink)
                 {

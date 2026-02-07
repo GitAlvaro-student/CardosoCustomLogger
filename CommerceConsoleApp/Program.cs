@@ -44,7 +44,7 @@ var provider = new CustomLoggerProviderBuilder()
 var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddProvider(provider);
-    builder.SetMinimumLevel(options.MinimumLogLevel);
+    builder.SetMinimumLevel((LogLevel)options.MinimumLogLevel);
 });
 
 var logger = loggerFactory.CreateLogger("Test");

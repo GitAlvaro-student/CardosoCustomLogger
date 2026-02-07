@@ -85,7 +85,7 @@ namespace CustomLogger.Providers
         {
             var section = configuration.GetSection("CustomLogger");
 
-            var config = section.Get<CustomLoggerConfiguration>();
+            var config = section.Get<LoggingOptions>();
             if (config is null)
                 return builder;
 
@@ -99,20 +99,20 @@ namespace CustomLogger.Providers
 
         private static void ApplyOptions(
         CustomProviderOptions options,
-        CustomLoggerConfiguration config)
+        LoggingOptions config)
         {
             if (Enum.TryParse<LogLevel>(
-                config.MinimumLogLevel,
+                config.MinimumLogLevel.ToString(),
                 ignoreCase: true,
                 out var level))
             {
                 options.MinimumLogLevel = level;
             }
 
-            if (config.Buffer != null && config.Buffer.Enabled)
+            if (config.BufferOptions != null && (bool)config.BufferOptions.Enabled)
             {
                 options.UseGlobalBuffer = true;
-                options.MaxBufferSize = config.Buffer.MaxSize;
+                options.MaxBufferSize = config.BufferOptions.MaxSize;
                 options.BatchOptions = new BatchOptions
                 {
                     BatchSize = 30,
@@ -123,10 +123,10 @@ namespace CustomLogger.Providers
 
         private static void ApplySinks(
             CustomLoggerProviderBuilder builder,
-            CustomLoggerConfiguration config,
+            LoggingOptions config,
             IConfiguration rootConfig)
         {
-            var sinks = config.Sinks;
+            var sinks = config.SinkOptions;
             if (sinks is null)
                 return;
 
