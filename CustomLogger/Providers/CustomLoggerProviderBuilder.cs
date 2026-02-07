@@ -27,6 +27,27 @@ namespace CustomLogger.Providers
             return this;
         }
 
+        /// <summary>
+        /// Adiciona sink COM modo degradado (wrapper automático).
+        /// </summary>
+        public CustomLoggerProviderBuilder AddSinkWithDegradation(ILogSink sink)
+        {
+            // Wrapper automático: sink → DegradableLogSink → CompositeLogSink
+            var degradableSink = new DegradableLogSink(sink);
+            _sinks.Add(degradableSink);
+            return this;
+        }
+
+        /// <summary>
+        /// Adiciona sink SEM modo degradado (uso direto).
+        /// </summary>
+        public CustomLoggerProviderBuilder AddSinkWithoutDegradation(ILogSink sink)
+        {
+            // Sem wrapper: sink → CompositeLogSink direto
+            _sinks.Add(sink);
+            return this;
+        }
+
         // CustomLoggerProviderBuilder.cs
         public CustomLoggerProviderBuilder AddSink(ILogSink sink)
         {
