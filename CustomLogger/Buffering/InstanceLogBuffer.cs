@@ -33,13 +33,13 @@ namespace CustomLogger.Buffering
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
             // RFC: Timer para flush periódico (se configurado)
-            if (_options.BatchOptions.FlushInterval > TimeSpan.Zero)
+            if (_options.BatchOptions.FlushIntervalMs > 0)
             {
                 _flushTimer = new Timer(
                     _ => Flush(),
                     null,
-                    _options.BatchOptions.FlushInterval,
-                    _options.BatchOptions.FlushInterval
+                    (int)_options.BatchOptions.FlushIntervalMs,
+                    (int)_options.BatchOptions.FlushIntervalMs
                 );
             }
 
@@ -70,7 +70,7 @@ namespace CustomLogger.Buffering
             // Se chegou aqui, Provider permitiu (estado é OPERATIONAL)
 
             // Modo sem buffer: escreve diretamente no sink
-            if (!_options.UseGlobalBuffer)
+            if ((bool)!_options.UseGlobalBuffer)
             {
                 try
                 {
@@ -109,7 +109,7 @@ namespace CustomLogger.Buffering
             }
 
             // Modo sem buffer: escreve diretamente
-            if (!_options.UseGlobalBuffer)
+            if ((bool)!_options.UseGlobalBuffer)
             {
                 if (_sink is IAsyncLogSink asyncSink)
                 {

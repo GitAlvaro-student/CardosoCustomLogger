@@ -15,18 +15,18 @@ namespace CustomLogger.Configurations
         /// Nível mínimo de log permitido.
         /// Logs abaixo desse nível serão ignorados.
         /// </summary>
-        public LogLevel MinimumLogLevel { get; set; } = LogLevel.Information;
+        public LogLevel? MinimumLogLevel { get; set; } = LogLevel.Information;
 
         /// <summary>
         /// Indica se o buffer global de logs deve ser utilizado.
         /// </summary>
-        public bool UseGlobalBuffer { get; set; } = true;
+        public bool? UseGlobalBuffer { get; set; } = true;
 
         /// <summary>
         /// Número máximo de logs mantidos no buffer antes do flush.
         /// </summary>
-        public int MaxBufferSize { get; set; } = 1000;
+        public int? MaxBufferSize { get; set; } = 1000;
 
-        public BatchOptions BatchOptions { get; set; } = new BatchOptions();
+        public BatchOptions BatchOptions { get; set; } = new BatchOptions(50, 5000);
     }
 }

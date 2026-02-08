@@ -345,16 +345,12 @@ namespace CustomLogger.Tests.Buffering
             ILogSink sink,
             bool useGlobalBuffer = true,
             int batchSize = 100,
-            TimeSpan? flushInterval = null)
+            int? flushInterval = null)
         {
             var options = new CustomProviderOptions
             {
                 UseGlobalBuffer = useGlobalBuffer,
-                BatchOptions = new BatchOptions
-                {
-                    BatchSize = batchSize,
-                    FlushInterval = flushInterval ?? TimeSpan.Zero
-                }
+                BatchOptions = new BatchOptions(batchSize, flushInterval ?? 0)
             };
 
             return new InstanceLogBuffer(sink, options);

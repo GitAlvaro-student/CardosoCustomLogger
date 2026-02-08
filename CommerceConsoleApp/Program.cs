@@ -24,27 +24,19 @@ var options = new CustomProviderOptions
 {
     MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    BatchOptions = new BatchOptions
-    {
-        BatchSize = 5,
-        FlushInterval = TimeSpan.FromSeconds(5)
-    }
+    BatchOptions = new BatchOptions(5, 5000)
 };
-
-var blobSink = new BlobStorageLogSink(connectionString, container, null);
 
 var provider = new CustomLoggerProviderBuilder()
     .WithOptions(options)
     .AddConsoleSink()
     .AddFileSink("C:/logs/Commerce/app.log")
-    .AddSinkWithDegradation(blobSink)
-    //.AddBlobSink(connectionString, container)
     .Build();
 
 var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddProvider(provider);
-    builder.SetMinimumLevel(options.MinimumLogLevel);
+    builder.SetMinimumLevel((LogLevel)options.MinimumLogLevel);
 });
 
 var logger = loggerFactory.CreateLogger("Test");

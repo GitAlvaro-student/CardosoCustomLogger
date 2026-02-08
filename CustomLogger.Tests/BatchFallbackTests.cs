@@ -23,11 +23,7 @@ namespace CustomLogger.Tests
             var options = new CustomProviderOptions
             {
                 UseGlobalBuffer = true,
-                BatchOptions = new BatchOptions
-                {
-                    BatchSize = 10,
-                    FlushInterval = TimeSpan.Zero
-                }
+                BatchOptions = new BatchOptions(10, 0)
             };
 
             var buffer = new InstanceLogBuffer(sink, options);

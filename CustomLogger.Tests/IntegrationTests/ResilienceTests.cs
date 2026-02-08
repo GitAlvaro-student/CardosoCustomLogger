@@ -140,11 +140,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 5,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(5, 0);
                 })
                 .AddSink(new FailingAsyncSink())
                 .Build();
@@ -172,11 +168,8 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 5,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(5, 0);
+
                 })
                 .AddSink(new FailingAsyncSink())
                 .AddSink(mockSink)
@@ -209,11 +202,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 100,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(100, 0);
                 })
                 .AddSink(mockSink)
                 .Build();
@@ -242,11 +231,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 50,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(50, 0);
                 })
                 .AddSink(mockSink)
                 .Build();
@@ -276,11 +261,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 100,  // Não faz flush até Dispose
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(100, 0);
                 })
                 .AddSink(slowSink)
                 .Build();
@@ -317,11 +298,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 5,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(5, 0);
                 })
                 .AddSink(slowSink)
                 .Build();
@@ -355,11 +332,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 10000,  // Nunca faz flush automático
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(10000, 0);
                 })
                 .AddSink(mockSink)
                 .Build();
@@ -387,11 +360,7 @@ namespace CustomLogger.Tests.IntegrationTests
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 10000,
-                        FlushInterval = TimeSpan.Zero
-                    };
+                    opts.BatchOptions = new BatchOptions(10000, 0);
                 })
                 .AddSink(new FailingSink())
                 .AddSink(new FailingSink())
