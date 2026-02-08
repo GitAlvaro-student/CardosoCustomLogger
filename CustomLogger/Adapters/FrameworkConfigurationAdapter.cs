@@ -62,28 +62,12 @@ namespace CustomLogger.Adapters
                 }
             }
 
-            var flushIntervalKey = "CustomLogger:Buffer:FlushIntervalMs";
-            var flushIntervalValue = appSettings[flushIntervalKey];
-            int? flushIntervalMs = null;
-            if (!string.IsNullOrWhiteSpace(flushIntervalValue))
-            {
-                if (int.TryParse(flushIntervalValue, out var parsedFlushInterval))
-                {
-                    flushIntervalMs = parsedFlushInterval;
-                }
-                else
-                {
-                    throw new FormatException($"Valor inválido para '{flushIntervalKey}': '{flushIntervalValue}'. Esperado um número inteiro.");
-                }
-            }
-
-            if (bufferEnabled.HasValue || maxSize.HasValue || flushIntervalMs.HasValue)
+            if (bufferEnabled.HasValue || maxSize.HasValue)
             {
                 bufferOptions = new BufferOptions
                 {
                     Enabled = bufferEnabled,
-                    MaxSize = maxSize,
-                    FlushIntervalMs = flushIntervalMs
+                    MaxSize = maxSize
                 };
             }
 
@@ -184,10 +168,52 @@ namespace CustomLogger.Adapters
                 };
             }
 
+            BatchOptions batchOptions = null;
+
+            var batchSizeKey = "CustomLogger:Batch:BatchSize";
+            var batchSizeValue = appSettings[batchSizeKey];
+            int? batchSize = null;
+            if (!string.IsNullOrWhiteSpace(batchSizeValue))
+            {
+                if (int.TryParse(batchSizeValue, out var parsedBatchSize))
+                {
+                    batchSize = parsedBatchSize;
+                }
+                else
+                {
+                    throw new FormatException($"Valor inválido para '{batchSizeKey}': '{batchSizeValue}'. Esperado um número inteiro.");
+                }
+            }
+
+            var batchIntervalKey = "CustomLogger:Batch:FlushIntervalMs";
+            var batchIntervalValue = appSettings[batchIntervalKey];
+            int? flushIntervalMs = null;
+            if (!string.IsNullOrWhiteSpace(batchIntervalValue))
+            {
+                if (int.TryParse(batchIntervalValue, out var parsedFlushInterval))
+                {
+                    flushIntervalMs = parsedFlushInterval;
+                }
+                else
+                {
+                    throw new FormatException($"Valor inválido para '{batchIntervalKey}': '{batchIntervalValue}'. Esperado um número inteiro.");
+                }
+            }
+
+            if (batchSize.HasValue || flushIntervalMs.HasValue)
+            {
+                batchOptions = new BatchOptions
+                {
+                    BatchSize = batchSize,
+                    FlushIntervalMs = flushIntervalMs
+                };
+            }
+
             return new LoggingOptions
             {
                 MinimumLogLevel = minimumLogLevel,
                 BufferOptions = bufferOptions,
+                BatchOptions = batchOptions,
                 SinkOptions = sinkOptions
             };
         }

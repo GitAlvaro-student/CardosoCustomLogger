@@ -27,7 +27,7 @@ namespace CustomLogger.Tests
                 BatchOptions = new BatchOptions
                 {
                     BatchSize = 1,
-                    FlushInterval = TimeSpan.Zero
+                    FlushIntervalMs = 0
                 }
             };
 

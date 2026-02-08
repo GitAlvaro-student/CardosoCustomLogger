@@ -193,7 +193,7 @@ namespace CustomLogger.Tests.Compatibility
                     opts.BatchOptions = new BatchOptions
                     {
                         BatchSize = 100,
-                        FlushInterval = TimeSpan.Zero
+                        FlushIntervalMs = 0
                     };
                 })
                 .AddSink(mockSink)

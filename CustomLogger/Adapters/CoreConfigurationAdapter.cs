@@ -45,18 +45,17 @@ namespace CustomLogger.Adapters
                     maxSize = parsedMaxSize;
                 }
 
-                int? flushIntervalMs = null;
+                int? FlushIntervalMs = null;
                 var flushIntervalValue = bufferSection["FlushIntervalMs"];
                 if (!string.IsNullOrWhiteSpace(flushIntervalValue) && int.TryParse(flushIntervalValue, out var parsedFlushInterval))
                 {
-                    flushIntervalMs = parsedFlushInterval;
+                    FlushIntervalMs = parsedFlushInterval;
                 }
 
                 bufferOptions = new BufferOptions
                 {
                     Enabled = bufferEnabled,
-                    MaxSize = maxSize,
-                    FlushIntervalMs = flushIntervalMs
+                    MaxSize = maxSize
                 };
             }
 
@@ -135,10 +134,36 @@ namespace CustomLogger.Adapters
                 };
             }
 
+            BatchOptions batchOptions = null;
+            var batchSection = section.GetSection("Batch");
+            if (batchSection.Exists())
+            {
+                int batchSize = 0;
+                var batchSizeValue = batchSection["BatchSize"];
+                if (!string.IsNullOrWhiteSpace(batchSizeValue) && int.TryParse(batchSizeValue, out var parsedBatchSize))
+                {
+                    batchSize = parsedBatchSize;
+                }
+
+                int? flushIntervalMs = null;
+                var flushIntervalValue = batchSection["FlushIntervalMs"];
+                if (!string.IsNullOrWhiteSpace(flushIntervalValue) && int.TryParse(flushIntervalValue, out var parsedFlushInterval))
+                {
+                    flushIntervalMs = parsedFlushInterval;
+                }
+
+                batchOptions = new BatchOptions
+                {
+                    BatchSize = batchSize,
+                    FlushIntervalMs = flushIntervalMs
+                };
+            }
+
             return new LoggingOptions
             {
                 MinimumLogLevel = minimumLogLevel,
                 BufferOptions = bufferOptions,
+                BatchOptions = batchOptions,
                 SinkOptions = sinkOptions
             };
         }

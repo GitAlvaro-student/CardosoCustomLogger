@@ -78,6 +78,18 @@ namespace CustomLogger.Providers
 
         public CustomLoggerProvider Build()
         {
+            if (_options == null)
+                throw new InvalidOperationException("Options não configurado. Use WithOptions().");
+
+            if (_sinks.Count == 0)
+                throw new InvalidOperationException("Nenhum sink configurado. Use Add*Sink().");
+
+            var compositeSink = new CompositeLogSink(_sinks);
+            return new CustomLoggerProvider(_options, compositeSink, _sinks);
+        }
+
+        public CustomLoggerProvider BuildApplication()
+        {
             if (_loggingOptions == null)
                 throw new InvalidOperationException("LoggingOptions não configurado. Use WithLoggingOptions().");
 
@@ -117,7 +129,6 @@ namespace CustomLogger.Providers
                 {
                     Enabled = true,
                     MaxSize = 50,
-                    FlushIntervalMs = 5000
                 };
             }
             else
@@ -128,8 +139,23 @@ namespace CustomLogger.Providers
                     buffer.Enabled = true;
                 if (!buffer.MaxSize.HasValue)
                     buffer.MaxSize = 50;
-                if (!buffer.FlushIntervalMs.HasValue)
-                    buffer.FlushIntervalMs = 5000;
+            }
+
+            if (_loggingOptions.BatchOptions == null)
+            {
+                _loggingOptions.BatchOptions = new BatchOptions
+                {
+                    BatchSize = 30,
+                    FlushIntervalMs = 5000
+                };
+            }
+            else
+            {
+                var batch = _loggingOptions.BatchOptions;
+                if (!batch.BatchSize.HasValue)
+                    batch.BatchSize = 30;
+                if (!batch.FlushIntervalMs.HasValue)
+                    batch.FlushIntervalMs = 5000;
             }
 
             // Aplica defaults para sinks
@@ -165,10 +191,13 @@ namespace CustomLogger.Providers
                         "BufferOptions.MaxSize deve ser maior que zero quando BufferOptions.Enabled é true.");
                 }
 
-                if (!buffer.FlushIntervalMs.HasValue || buffer.FlushIntervalMs.Value <= 0)
+                var batch = _loggingOptions.BatchOptions;
+                if (batch != null)
                 {
-                    throw new InvalidOperationException(
-                        "BufferOptions.FlushIntervalMs deve ser maior que zero quando BufferOptions.Enabled é true.");
+                    if (batch.BatchSize.HasValue && batch.BatchSize.Value <= 0)
+                    {
+                        throw new InvalidOperationException("BatchOptions.BatchSize deve ser maior que zero.");
+                    }
                 }
             }
 
@@ -214,15 +243,24 @@ namespace CustomLogger.Providers
             {
                 options.UseGlobalBuffer = true;
                 options.MaxBufferSize = _loggingOptions.BufferOptions.MaxSize.Value;
+            }
+
+            if (_loggingOptions.BatchOptions != null)
+            {
                 options.BatchOptions = new BatchOptions
                 {
-                    BatchSize = 50,
-                    FlushInterval = TimeSpan.FromMilliseconds(_loggingOptions.BufferOptions.FlushIntervalMs.Value)
+                    BatchSize = _loggingOptions.BatchOptions.BatchSize.Value,
+                    FlushIntervalMs = _loggingOptions.BatchOptions.FlushIntervalMs
                 };
+            }
+            else
+            {
+                options.BatchOptions = new BatchOptions();
             }
 
             return options;
         }
+
 
         private void CreateSinksFromOptions()
         {

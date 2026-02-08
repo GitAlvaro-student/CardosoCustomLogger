@@ -169,7 +169,7 @@ namespace CustomLogger.Tests.IntegrationTests
                     opts.BatchOptions = new BatchOptions
                     {
                         BatchSize = 5,
-                        FlushInterval = TimeSpan.Zero
+                        FlushIntervalMs = 0
                     };
                 })
                 .AddSink(mockSink)
@@ -207,7 +207,7 @@ namespace CustomLogger.Tests.IntegrationTests
                     opts.BatchOptions = new BatchOptions
                     {
                         BatchSize = 100,  // Nunca atinge
-                        FlushInterval = TimeSpan.Zero
+                        FlushIntervalMs = 0
                     };
                 })
                 .AddSink(mockSink)
@@ -278,7 +278,7 @@ namespace CustomLogger.Tests.IntegrationTests
                     opts.BatchOptions = new BatchOptions
                     {
                         BatchSize = 1000,
-                        FlushInterval = TimeSpan.Zero
+                        FlushIntervalMs = 0
                     };
                 })
                 .AddSink(mockSink)

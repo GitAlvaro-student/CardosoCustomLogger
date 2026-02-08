@@ -345,7 +345,7 @@ namespace CustomLogger.Tests.Buffering
             ILogSink sink,
             bool useGlobalBuffer = true,
             int batchSize = 100,
-            TimeSpan? flushInterval = null)
+            int? flushInterval = null)
         {
             var options = new CustomProviderOptions
             {
@@ -353,7 +353,7 @@ namespace CustomLogger.Tests.Buffering
                 BatchOptions = new BatchOptions
                 {
                     BatchSize = batchSize,
-                    FlushInterval = flushInterval ?? TimeSpan.Zero
+                    FlushIntervalMs = flushInterval ?? 0
                 }
             };
 

@@ -27,18 +27,14 @@ var options = new CustomProviderOptions
     BatchOptions = new BatchOptions
     {
         BatchSize = 5,
-        FlushInterval = TimeSpan.FromSeconds(5)
+        FlushIntervalMs = 5000
     }
 };
-
-var blobSink = new BlobStorageLogSink(connectionString, container, null);
 
 var provider = new CustomLoggerProviderBuilder()
     .WithOptions(options)
     .AddConsoleSink()
     .AddFileSink("C:/logs/Commerce/app.log")
-    .AddSinkWithDegradation(blobSink)
-    //.AddBlobSink(connectionString, container)
     .Build();
 
 var loggerFactory = LoggerFactory.Create(builder =>

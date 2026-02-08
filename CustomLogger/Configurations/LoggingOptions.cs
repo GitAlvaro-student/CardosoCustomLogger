@@ -9,6 +9,7 @@ namespace CustomLogger.Configurations
     {
         public LogLevel? MinimumLogLevel { get; set; }
         public BufferOptions BufferOptions { get; set; }
+        public BatchOptions BatchOptions { get; set; }
         public SinkOptions SinkOptions { get; set; }
     }
 
@@ -16,6 +17,11 @@ namespace CustomLogger.Configurations
     {
         public bool? Enabled { get; set; }
         public int? MaxSize { get; set; }
+    }
+
+    public sealed class BatchOptions
+    {
+        public int? BatchSize { get; set; }
         public int? FlushIntervalMs { get; set; }
     }
 
