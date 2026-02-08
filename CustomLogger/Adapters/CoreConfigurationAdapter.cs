@@ -45,18 +45,7 @@ namespace CustomLogger.Adapters
                     maxSize = parsedMaxSize;
                 }
 
-                int? FlushIntervalMs = null;
-                var flushIntervalValue = bufferSection["FlushIntervalMs"];
-                if (!string.IsNullOrWhiteSpace(flushIntervalValue) && int.TryParse(flushIntervalValue, out var parsedFlushInterval))
-                {
-                    FlushIntervalMs = parsedFlushInterval;
-                }
-
-                bufferOptions = new BufferOptions
-                {
-                    Enabled = bufferEnabled,
-                    MaxSize = maxSize
-                };
+                bufferOptions = new BufferOptions(bufferEnabled, maxSize);
             }
 
             // SinkOptions
@@ -76,10 +65,7 @@ namespace CustomLogger.Adapters
                         consoleEnabled = parsedConsoleEnabled;
                     }
 
-                    consoleOptions = new ConsoleSinkOptions
-                    {
-                        Enabled = consoleEnabled
-                    };
+                    consoleOptions = new ConsoleSinkOptions(consoleEnabled);
                 }
 
                 // File
@@ -96,11 +82,7 @@ namespace CustomLogger.Adapters
 
                     var filePath = fileSection["Path"];
 
-                    fileOptions = new FileSinkOptions
-                    {
-                        Enabled = fileEnabled,
-                        Path = filePath
-                    };
+                    fileOptions = new FileSinkOptions(fileEnabled, filePath);
                 }
 
                 // BlobStorage
@@ -118,27 +100,25 @@ namespace CustomLogger.Adapters
                     var connectionString = blobSection["ConnectionString"];
                     var containerName = blobSection["ContainerName"];
 
-                    blobOptions = new BlobStorageSinkOptions
-                    {
-                        Enabled = blobEnabled,
-                        ConnectionString = connectionString,
-                        ContainerName = containerName
-                    };
+                    blobOptions = new BlobStorageSinkOptions(
+                        blobEnabled,
+                        connectionString,
+                        containerName
+                    );
                 }
 
-                sinkOptions = new SinkOptions
-                {
-                    Console = consoleOptions,
-                    File = fileOptions,
-                    BlobStorage = blobOptions
-                };
+                sinkOptions = new SinkOptions(
+                    consoleOptions,
+                    fileOptions,
+                    blobOptions
+                );
             }
 
             BatchOptions batchOptions = null;
             var batchSection = section.GetSection("Batch");
             if (batchSection.Exists())
             {
-                int batchSize = 0;
+                int? batchSize = null;
                 var batchSizeValue = batchSection["BatchSize"];
                 if (!string.IsNullOrWhiteSpace(batchSizeValue) && int.TryParse(batchSizeValue, out var parsedBatchSize))
                 {
@@ -152,20 +132,15 @@ namespace CustomLogger.Adapters
                     flushIntervalMs = parsedFlushInterval;
                 }
 
-                batchOptions = new BatchOptions
-                {
-                    BatchSize = batchSize,
-                    FlushIntervalMs = flushIntervalMs
-                };
+                batchOptions = new BatchOptions(batchSize, flushIntervalMs);
             }
 
-            return new LoggingOptions
-            {
-                MinimumLogLevel = minimumLogLevel,
-                BufferOptions = bufferOptions,
-                BatchOptions = batchOptions,
-                SinkOptions = sinkOptions
-            };
+            return new LoggingOptions(
+                    minimumLogLevel,
+                    bufferOptions,
+                    batchOptions,
+                    sinkOptions
+                );
         }
     }
 }

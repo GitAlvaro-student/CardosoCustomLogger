@@ -25,7 +25,7 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{levelKey}': '{levelStr}'. Esperado um valor válido de LogLevel.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{levelKey}': '{levelStr}'. Esperado um valor válido de LogLevel.");
                 }
             }
 
@@ -43,7 +43,7 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{bufferEnabledKey}': '{bufferEnabledValue}'. Esperado 'true' ou 'false'.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{bufferEnabledKey}': '{bufferEnabledValue}'. Esperado 'true' ou 'false'.");
                 }
             }
 
@@ -58,17 +58,13 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{maxSizeKey}': '{maxSizeValue}'. Esperado um número inteiro.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{maxSizeKey}': '{maxSizeValue}'. Esperado um número inteiro.");
                 }
             }
 
             if (bufferEnabled.HasValue || maxSize.HasValue)
             {
-                bufferOptions = new BufferOptions
-                {
-                    Enabled = bufferEnabled,
-                    MaxSize = maxSize
-                };
+                bufferOptions = new BufferOptions(bufferEnabled, maxSize);
             }
 
             // SinkOptions
@@ -87,13 +83,10 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{consoleEnabledKey}': '{consoleEnabledValue}'. Esperado 'true' ou 'false'.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{consoleEnabledKey}': '{consoleEnabledValue}'. Esperado 'true' ou 'false'.");
                 }
 
-                consoleOptions = new ConsoleSinkOptions
-                {
-                    Enabled = consoleEnabled
-                };
+                consoleOptions = new ConsoleSinkOptions(consoleEnabled);
             }
 
             // File
@@ -109,7 +102,7 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{fileEnabledKey}': '{fileEnabledValue}'. Esperado 'true' ou 'false'.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{fileEnabledKey}': '{fileEnabledValue}'. Esperado 'true' ou 'false'.");
                 }
             }
 
@@ -118,11 +111,7 @@ namespace CustomLogger.Adapters
 
             if (fileEnabled.HasValue || !string.IsNullOrWhiteSpace(filePath))
             {
-                fileOptions = new FileSinkOptions
-                {
-                    Enabled = fileEnabled,
-                    Path = filePath
-                };
+                fileOptions = new FileSinkOptions(fileEnabled, filePath);
             }
 
             // BlobStorage
@@ -138,7 +127,7 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{blobEnabledKey}': '{blobEnabledValue}'. Esperado 'true' ou 'false'.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{blobEnabledKey}': '{blobEnabledValue}'. Esperado 'true' ou 'false'.");
                 }
             }
 
@@ -150,22 +139,12 @@ namespace CustomLogger.Adapters
 
             if (blobEnabled.HasValue || !string.IsNullOrWhiteSpace(connectionString) || !string.IsNullOrWhiteSpace(containerName))
             {
-                blobOptions = new BlobStorageSinkOptions
-                {
-                    Enabled = blobEnabled,
-                    ConnectionString = connectionString,
-                    ContainerName = containerName
-                };
+                blobOptions = new BlobStorageSinkOptions(blobEnabled, connectionString, containerName);
             }
 
             if (consoleOptions != null || fileOptions != null || blobOptions != null)
             {
-                sinkOptions = new SinkOptions
-                {
-                    Console = consoleOptions,
-                    File = fileOptions,
-                    BlobStorage = blobOptions
-                };
+                sinkOptions = new SinkOptions(consoleOptions, fileOptions, blobOptions);
             }
 
             BatchOptions batchOptions = null;
@@ -181,7 +160,7 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{batchSizeKey}': '{batchSizeValue}'. Esperado um número inteiro.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{batchSizeKey}': '{batchSizeValue}'. Esperado um número inteiro.");
                 }
             }
 
@@ -196,26 +175,21 @@ namespace CustomLogger.Adapters
                 }
                 else
                 {
-                    throw new FormatException($"Valor inválido para '{batchIntervalKey}': '{batchIntervalValue}'. Esperado um número inteiro.");
+                    throw new ConfigurationErrorsException($"Valor inválido para '{batchIntervalKey}': '{batchIntervalValue}'. Esperado um número inteiro.");
                 }
             }
 
             if (batchSize.HasValue || flushIntervalMs.HasValue)
             {
-                batchOptions = new BatchOptions
-                {
-                    BatchSize = batchSize,
-                    FlushIntervalMs = flushIntervalMs
-                };
+                batchOptions = new BatchOptions(batchSize, flushIntervalMs);
             }
 
-            return new LoggingOptions
-            {
-                MinimumLogLevel = minimumLogLevel,
-                BufferOptions = bufferOptions,
-                BatchOptions = batchOptions,
-                SinkOptions = sinkOptions
-            };
+            return new LoggingOptions(
+                    minimumLogLevel,
+                    bufferOptions,
+                    batchOptions,
+                    sinkOptions
+                );
         }
     }
 }

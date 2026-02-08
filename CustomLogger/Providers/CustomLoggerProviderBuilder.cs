@@ -117,64 +117,61 @@ namespace CustomLogger.Providers
             if (_defaultsApplied)
                 return;
 
-            // Aplica defaults do Core
-            if (!_loggingOptions.MinimumLogLevel.HasValue)
-            {
-                _loggingOptions.MinimumLogLevel = LogLevel.Information;
-            }
+            var effectiveMinimumLevel =
+                _loggingOptions.MinimumLogLevel ?? LogLevel.Information;
 
-            if (_loggingOptions.BufferOptions == null)
-            {
-                _loggingOptions.BufferOptions = new BufferOptions
-                {
-                    Enabled = true,
-                    MaxSize = 50,
-                };
-            }
-            else
-            {
-                // Aplica defaults para propriedades individuais do buffer
-                var buffer = _loggingOptions.BufferOptions;
-                if (!buffer.Enabled.HasValue)
-                    buffer.Enabled = true;
-                if (!buffer.MaxSize.HasValue)
-                    buffer.MaxSize = 50;
-            }
+            var effectiveBufferOptions =
+                _loggingOptions.BufferOptions ?? new BufferOptions(
+                    enabled: true,
+                    maxSize: 50
+                );
 
-            if (_loggingOptions.BatchOptions == null)
-            {
-                _loggingOptions.BatchOptions = new BatchOptions
-                {
-                    BatchSize = 30,
-                    FlushIntervalMs = 5000
-                };
-            }
-            else
-            {
-                var batch = _loggingOptions.BatchOptions;
-                if (!batch.BatchSize.HasValue)
-                    batch.BatchSize = 30;
-                if (!batch.FlushIntervalMs.HasValue)
-                    batch.FlushIntervalMs = 5000;
-            }
+            var effectiveBatchOptions =
+                _loggingOptions.BatchOptions ?? new BatchOptions(
+                    batchSize: 30,
+                    flushIntervalMs: 5000
+                );
 
-            // Aplica defaults para sinks
+            SinkOptions effectiveSinkOptions = null;
+
             if (_loggingOptions.SinkOptions != null)
             {
                 var sinks = _loggingOptions.SinkOptions;
 
-                if (sinks.Console != null && !sinks.Console.Enabled.HasValue)
-                    sinks.Console.Enabled = true;
+                effectiveSinkOptions = new SinkOptions(
+                    console: sinks.Console != null
+                        ? new ConsoleSinkOptions(
+                            enabled: sinks.Console.Enabled ?? true
+                          )
+                        : null,
 
-                if (sinks.File != null && !sinks.File.Enabled.HasValue)
-                    sinks.File.Enabled = false;
+                    file: sinks.File != null
+                        ? new FileSinkOptions(
+                            enabled: sinks.File.Enabled ?? false,
+                            path: sinks.File.Path
+                          )
+                        : null,
 
-                if (sinks.BlobStorage != null && !sinks.BlobStorage.Enabled.HasValue)
-                    sinks.BlobStorage.Enabled = false;
+                    blobStorage: sinks.BlobStorage != null
+                        ? new BlobStorageSinkOptions(
+                            enabled: sinks.BlobStorage.Enabled ?? false,
+                            connectionString: sinks.BlobStorage.ConnectionString,
+                            containerName: sinks.BlobStorage.ContainerName
+                          )
+                        : null
+                );
             }
+
+            _loggingOptions = new LoggingOptions(
+                minimumLogLevel: effectiveMinimumLevel,
+                bufferOptions: effectiveBufferOptions,
+                batchOptions: effectiveBatchOptions,
+                sinkOptions: effectiveSinkOptions
+            );
 
             _defaultsApplied = true;
         }
+
 
         private void ValidateConfiguration()
         {
@@ -247,15 +244,14 @@ namespace CustomLogger.Providers
 
             if (_loggingOptions.BatchOptions != null)
             {
-                options.BatchOptions = new BatchOptions
-                {
-                    BatchSize = _loggingOptions.BatchOptions.BatchSize.Value,
-                    FlushIntervalMs = _loggingOptions.BatchOptions.FlushIntervalMs
-                };
+                options.BatchOptions = new BatchOptions(
+                    _loggingOptions.BatchOptions.BatchSize.Value,
+                    _loggingOptions.BatchOptions.FlushIntervalMs
+                    );
             }
             else
             {
-                options.BatchOptions = new BatchOptions();
+                options.BatchOptions = new BatchOptions(30, 5000);
             }
 
             return options;

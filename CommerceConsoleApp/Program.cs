@@ -24,11 +24,7 @@ var options = new CustomProviderOptions
 {
     MinimumLogLevel = LogLevel.Trace,
     UseGlobalBuffer = true,
-    BatchOptions = new BatchOptions
-    {
-        BatchSize = 5,
-        FlushIntervalMs = 5000
-    }
+    BatchOptions = new BatchOptions(5, 5000)
 };
 
 var provider = new CustomLoggerProviderBuilder()

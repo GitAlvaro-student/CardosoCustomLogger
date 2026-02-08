@@ -190,11 +190,7 @@ namespace CustomLogger.Tests.Compatibility
                 {
                     opts.MinimumLogLevel = LogLevel.Trace;
                     opts.UseGlobalBuffer = true;  // Usa buffer (ConcurrentQueue)
-                    opts.BatchOptions = new BatchOptions
-                    {
-                        BatchSize = 100,
-                        FlushIntervalMs = 0
-                    };
+                    opts.BatchOptions = new BatchOptions(100, 0);
                 })
                 .AddSink(mockSink)
                 .Build();

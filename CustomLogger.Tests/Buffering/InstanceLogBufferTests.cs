@@ -350,11 +350,7 @@ namespace CustomLogger.Tests.Buffering
             var options = new CustomProviderOptions
             {
                 UseGlobalBuffer = useGlobalBuffer,
-                BatchOptions = new BatchOptions
-                {
-                    BatchSize = batchSize,
-                    FlushIntervalMs = flushInterval ?? 0
-                }
+                BatchOptions = new BatchOptions(batchSize, flushInterval ?? 0)
             };
 
             return new InstanceLogBuffer(sink, options);
