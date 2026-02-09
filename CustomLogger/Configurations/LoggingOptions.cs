@@ -52,7 +52,7 @@ namespace CustomLogger.Configurations
         public BufferOptions(bool? enabled, int? maxSize)
         {
             Enabled = enabled;
-            MaxSize = maxSize;
+            MaxSize = maxSize ?? 50;
         }
     }
 
@@ -62,8 +62,8 @@ namespace CustomLogger.Configurations
         public int? FlushIntervalMs { get; }
         public BatchOptions(int? batchSize, int? flushIntervalMs)
         {
-            BatchSize = batchSize;
-            FlushIntervalMs = flushIntervalMs;
+            BatchSize = batchSize ?? 30;
+            FlushIntervalMs = flushIntervalMs ?? 0;
         }
     }
 
@@ -72,11 +72,15 @@ namespace CustomLogger.Configurations
         public ConsoleSinkOptions Console { get; }
         public FileSinkOptions File { get; }
         public BlobStorageSinkOptions BlobStorage { get; }
-        public SinkOptions(ConsoleSinkOptions console, FileSinkOptions file, BlobStorageSinkOptions blobStorage)
+        public DynatraceSinkOptions Dynatrace { get; } // NOVO
+
+        public SinkOptions(ConsoleSinkOptions console, FileSinkOptions file,
+                          BlobStorageSinkOptions blobStorage, DynatraceSinkOptions dynatrace = null) // Alterado
         {
             Console = console;
             File = file;
             BlobStorage = blobStorage;
+            Dynatrace = dynatrace; // NOVO
         }
     }
 
@@ -111,6 +115,22 @@ namespace CustomLogger.Configurations
             Enabled = enabled;
             ConnectionString = connectionString;
             ContainerName = containerName;
+        }
+    }
+
+    public sealed class DynatraceSinkOptions
+    {
+        public bool? Enabled { get; }
+        public string Endpoint { get; }
+        public string ApiToken { get; }
+        public int? TimeoutSeconds { get; }
+
+        public DynatraceSinkOptions(bool? enabled, string endpoint, string apiToken, int? timeoutSeconds)
+        {
+            Enabled = enabled;
+            Endpoint = endpoint;
+            ApiToken = apiToken;
+            TimeoutSeconds = timeoutSeconds ?? 5; // Default 3 segundos
         }
     }
 }

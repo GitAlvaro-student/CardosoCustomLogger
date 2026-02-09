@@ -142,9 +142,65 @@ namespace CustomLogger.Adapters
                 blobOptions = new BlobStorageSinkOptions(blobEnabled, connectionString, containerName);
             }
 
-            if (consoleOptions != null || fileOptions != null || blobOptions != null)
+            // Dynatrace
+            DynatraceSinkOptions dynatraceOptions = null;
+
+            var dynatraceEnabledKey = "CustomLogger:Sinks:Dynatrace:Enabled";
+            var dynatraceEnabledValue = appSettings[dynatraceEnabledKey];
+            bool? dynatraceEnabled = null;
+            if (!string.IsNullOrWhiteSpace(dynatraceEnabledValue))
             {
-                sinkOptions = new SinkOptions(consoleOptions, fileOptions, blobOptions);
+                if (bool.TryParse(dynatraceEnabledValue, out var parsedDynatraceEnabled))
+                {
+                    dynatraceEnabled = parsedDynatraceEnabled;
+                }
+                else
+                {
+                    throw new ConfigurationErrorsException($"Valor inválido para '{dynatraceEnabledKey}': '{dynatraceEnabledValue}'.");
+                }
+            }
+
+            var endpointKey = "CustomLogger:Sinks:Dynatrace:Endpoint";
+            var endpoint = appSettings[endpointKey];
+
+            var apiTokenKey = "CustomLogger:Sinks:Dynatrace:ApiToken";
+            var apiToken = appSettings[apiTokenKey];
+
+            var timeoutKey = "CustomLogger:Sinks:Dynatrace:TimeoutSeconds";
+            var timeoutValue = appSettings[timeoutKey];
+            int? timeoutSeconds = null;
+            if (!string.IsNullOrWhiteSpace(timeoutValue))
+            {
+                if (int.TryParse(timeoutValue, out var parsedTimeout))
+                {
+                    timeoutSeconds = parsedTimeout;
+                }
+                else
+                {
+                    throw new ConfigurationErrorsException($"Valor inválido para '{timeoutKey}': '{timeoutValue}'.");
+                }
+            }
+
+            if (dynatraceEnabled.HasValue || !string.IsNullOrWhiteSpace(endpoint) ||
+                !string.IsNullOrWhiteSpace(apiToken) || timeoutSeconds.HasValue)
+            {
+                dynatraceOptions = new DynatraceSinkOptions(
+                    dynatraceEnabled,
+                    endpoint,
+                    apiToken,
+                    timeoutSeconds
+                );
+            }
+
+            if (consoleOptions != null || fileOptions != null ||
+                blobOptions != null || dynatraceOptions != null) // Alterado
+            {
+                sinkOptions = new SinkOptions(
+                    consoleOptions,
+                    fileOptions,
+                    blobOptions,
+                    dynatraceOptions // NOVO
+                );
             }
 
             BatchOptions batchOptions = null;

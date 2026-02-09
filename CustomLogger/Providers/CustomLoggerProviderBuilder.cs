@@ -5,6 +5,7 @@ using CustomLogger.Sinks;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Text;
 
 namespace CustomLogger.Providers
@@ -73,6 +74,12 @@ namespace CustomLogger.Providers
         public CustomLoggerProviderBuilder AddBlobSink(string connectionString, string container, ILogFormatter formatter = null)
         {
             _sinks.Add(new BlobStorageLogSink(connectionString, container, formatter ?? new JsonLogFormatter()));
+            return this;
+        }
+
+        public CustomLoggerProviderBuilder AddDynatraceLogSink(string endpoint, string apiToken, HttpClient httpClient = null, ILogFormatter formatter = null)
+        {
+            _sinks.Add(new DynatraceLogSink(endpoint, apiToken, httpClient, formatter ?? new JsonLogFormatter()));
             return this;
         }
 
@@ -158,6 +165,14 @@ namespace CustomLogger.Providers
                             connectionString: sinks.BlobStorage.ConnectionString,
                             containerName: sinks.BlobStorage.ContainerName
                           )
+                        : null,
+                    dynatrace: sinks.Dynatrace != null
+                        ? new DynatraceSinkOptions(
+                        enabled: sinks.Dynatrace.Enabled ?? false, // Padrão: false (só envia se explicitamente habilitado)
+                        endpoint: sinks.Dynatrace.Endpoint,
+                        apiToken: sinks.Dynatrace.ApiToken,
+                        timeoutSeconds: sinks.Dynatrace.TimeoutSeconds ?? 3
+                          )
                         : null
                 );
             }
@@ -226,6 +241,29 @@ namespace CustomLogger.Providers
                 }
             }
 
+            // Valida DynatraceSink
+            var dynatraceSink = _loggingOptions.SinkOptions?.Dynatrace;
+            if (dynatraceSink != null && dynatraceSink.Enabled.HasValue && dynatraceSink.Enabled.Value)
+            {
+                if (string.IsNullOrWhiteSpace(dynatraceSink.Endpoint))
+                {
+                    throw new InvalidOperationException(
+                        "DynatraceSinkOptions.Endpoint não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
+                }
+
+                if (string.IsNullOrWhiteSpace(dynatraceSink.ApiToken))
+                {
+                    throw new InvalidOperationException(
+                        "DynatraceSinkOptions.ApiToken não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
+                }
+
+                if (dynatraceSink.TimeoutSeconds.HasValue && dynatraceSink.TimeoutSeconds.Value <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "DynatraceSinkOptions.TimeoutSeconds deve ser maior que zero.");
+                }
+            }
+
             _validated = true;
         }
 
@@ -291,13 +329,22 @@ namespace CustomLogger.Providers
                     AddBlobSink(sinks.BlobStorage.ConnectionString, sinks.BlobStorage.ContainerName);
                 }
             }
+
+            if (sinks.Dynatrace != null && sinks.Dynatrace.Enabled.HasValue && sinks.Dynatrace.Enabled.Value)
+            {
+                if (!string.IsNullOrWhiteSpace(sinks.Dynatrace.Endpoint) &&
+                    !string.IsNullOrWhiteSpace(sinks.Dynatrace.ApiToken))
+                {
+                    AddDynatraceLogSink(sinks.Dynatrace.Endpoint, sinks.Dynatrace.ApiToken);
+                }
+            }
         }
 
         private bool SinkExists<T>() where T : ILogSink
         {
             foreach (var sink in _sinks)
             {
-                if (sink is T)
+                if (sink is T || sink is DegradableLogSink degradable)
                     return true;
             }
             return false;

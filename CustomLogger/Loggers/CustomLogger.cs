@@ -4,6 +4,7 @@ using CustomLogger.Configurations;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CustomLogger.Loggers
@@ -65,6 +66,8 @@ namespace CustomLogger.Loggers
             Exception exception,
             Func<TState, Exception, string> formatter)
         {
+            Debug.WriteLine("[Log<TState>] >>> Iniciando Log<TState>");
+
             if (!IsEnabled(logLevel))
                 return;
 
