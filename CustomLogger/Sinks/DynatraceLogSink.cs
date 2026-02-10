@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CustomLogger.Sinks
 {
-    public sealed class DynatraceLogSink : ILogSink, IDisposable
+    public sealed class DynatraceLogSink : ILogSink//, IAsyncLogSink, IBatchLogSink, IAsyncBatchLogSink, IDisposable
     {
         private readonly ILogFormatter _formatter;
         private readonly string _endpoint;
@@ -95,6 +96,60 @@ namespace CustomLogger.Sinks
                 //request.Dispose();
             }
         }
+
+        //// Espelho assíncrono de Write - mesma semântica, versão async
+        //public Task WriteAsync(ILogEntry entry, CancellationToken cancellationToken = default)
+        //{
+        //    if (entry?.State == null)
+        //        return Task.CompletedTask;
+
+        //    var json = _formatter.Format(entry);
+        //    if (string.IsNullOrWhiteSpace(json))
+        //        return Task.CompletedTask;
+
+        //    var request = new HttpRequestMessage(HttpMethod.Post, _endpoint)
+        //    {
+        //        Content = new StringContent(json, Encoding.UTF8, "application/json")
+        //    };
+        //    request.Headers.Add("Authorization", $"Api-Token {_apiToken}");
+
+        //    var sendTask = _httpClient.SendAsync(request, cancellationToken);
+
+        //    sendTask.ContinueWith(
+        //        t => { var _ = t.Exception; },
+        //        TaskContinuationOptions.OnlyOnFaulted |
+        //        TaskContinuationOptions.ExecuteSynchronously
+        //    );
+
+        //    return Task.CompletedTask;
+        //}
+
+
+        //// Iteração simples sobre entries - não é batch HTTP real
+        //public void WriteBatch(IEnumerable<ILogEntry> entries)
+        //{
+        //    if (entries == null)
+        //        return;
+
+        //    // Chama Write para cada entry sequencialmente
+        //    foreach (var entry in entries)
+        //    {
+        //        Write(entry);
+        //    }
+        //}
+
+        //// Espelho assíncrono de WriteBatch - iteração sequencial
+        //public async Task WriteBatchAsync(IEnumerable<ILogEntry> entries, CancellationToken cancellationToken = default)
+        //{
+        //    if (entries == null)
+        //        return;
+
+        //    // Chama WriteAsync para cada entry sequencialmente
+        //    foreach (var entry in entries)
+        //    {
+        //        await WriteAsync(entry, cancellationToken);
+        //    }
+        //}
 
         public void Dispose()
         {
