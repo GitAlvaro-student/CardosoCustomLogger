@@ -2,6 +2,8 @@
 using GamesAPI.Models;
 using GamesAPI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace GamesAPI.Controllers
 {
@@ -60,9 +62,32 @@ namespace GamesAPI.Controllers
         {
             try
             {
-                _logger.LogDebug(GameEventIds.ConsultarPorId,
-                    "Iniciando consulta do jogo ID: {JogoId}", id);
-
+                //_logger.LogDebug(GameEventIds.ConsultarPorId,
+                //    "Iniciando consulta do jogo ID: {JogoId}", id);
+                var activity = new Activity("ObterPorId").Start();
+                var scopes = new Dictionary<string, object>
+                {
+                    ["traceId"] = activity.Context.TraceId.ToString(),
+                    ["spanId"] = activity.Context.SpanId.ToString()
+                };
+                using (_logger.BeginScope(scopes))
+                {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        _logger.LogTrace(GameEventIds.ConsultarPorId,
+                        "Trace - Iniciando consulta do jogo ID: {JogoId}", id);
+                        _logger.LogDebug(GameEventIds.ConsultarPorId,
+                            "Debug - Iniciando consulta do jogo ID: {JogoId}", id);
+                        _logger.LogInformation(GameEventIds.ConsultarPorId,
+                            "Information - Iniciando consulta do jogo ID: {JogoId}", id);
+                        _logger.LogWarning(GameEventIds.ConsultarPorId, new InvalidOperationException("Invalid Generic Operation"),
+                            "Warning - Iniciando consulta do jogo ID: {JogoId}", id);
+                        _logger.LogError(GameEventIds.ConsultarPorId, new InvalidOperationException("Invalid Generic Operation"),
+                            "Error - Iniciando consulta do jogo ID: {JogoId}", id);
+                        _logger.LogCritical(GameEventIds.ConsultarPorId, new InvalidOperationException("Invalid Generic Operation"),
+                            "Critical - Iniciando consulta do jogo ID: {JogoId}", id);
+                    }
+                }
                 var jogo = _jogoService.ObterPorId(id);
 
                 if (jogo == null)
@@ -72,8 +97,8 @@ namespace GamesAPI.Controllers
                     return NotFound($"Jogo com ID {id} não encontrado.");
                 }
 
-                _logger.LogInformation(GameEventIds.JogoEncontrado,
-                    "Retornando jogo: {JogoTitulo} (ID: {JogoId})", jogo.Titulo, id);
+                //_logger.LogInformation(GameEventIds.JogoEncontrado,
+                //    "Retornando jogo: {JogoTitulo} (ID: {JogoId})", jogo.Titulo, id);
 
                 return Ok(jogo);
             }
