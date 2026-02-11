@@ -63,7 +63,7 @@ namespace CustomLogger.Configurations
         public BatchOptions(int? batchSize, int? flushIntervalMs)
         {
             BatchSize = batchSize ?? 30;
-            FlushIntervalMs = flushIntervalMs ?? 0;
+            FlushIntervalMs = flushIntervalMs ?? 5000;
         }
     }
 
