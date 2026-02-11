@@ -149,7 +149,7 @@ namespace CustomLogger.Buffering
             // RFC: Flush automático ao atingir BatchSize
             if (_queue.Count >= _options.BatchOptions.BatchSize)
             {
-                Debug.WriteLine("[EnqueueAsync] >>> Iniciando FlushAsync");
+                Debug.WriteLine("[EnqueueAsync] >>> Iniciando FlushAsync por Atingir BatchSize");
                 await FlushAsync(cancellationToken);
             }
         }

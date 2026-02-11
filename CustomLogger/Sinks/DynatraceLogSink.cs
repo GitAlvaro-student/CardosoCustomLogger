@@ -1,6 +1,7 @@
 ﻿using CustomLogger.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CustomLogger.Sinks
 {
-    public sealed class DynatraceLogSink : ILogSink//, IAsyncLogSink, IBatchLogSink, IAsyncBatchLogSink, IDisposable
+    public sealed class DynatraceLogSink : IAsyncBatchLogSink, IDisposable
     {
         private readonly ILogFormatter _formatter;
         private readonly string _endpoint;
@@ -23,6 +24,8 @@ namespace CustomLogger.Sinks
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _httpClient = httpClient ?? CreateDefaultHttpClient();
             _shouldDisposeClient = httpClient == null;
+
+            Debug.WriteLine("******* DynatraceLogSink Instanciado! *******");
         }
 
         private static HttpClient CreateDefaultHttpClient()
@@ -65,27 +68,30 @@ namespace CustomLogger.Sinks
                     TaskContinuationOptions.OnlyOnFaulted |
                     TaskContinuationOptions.ExecuteSynchronously
                 );
-
-
             }
             catch (HttpRequestException)
             {
+                Debug.WriteLine("============ Exception: HttpRequestException ============");
+
                 // Exceção síncrona do SendAsync (endpoint inválido, rede, etc.)
                 // Deve ser lançada para DegradableLogSink marcar degradação
                 throw;
             }
             catch (TaskCanceledException)
             {
+                Debug.WriteLine("============ Exception: TaskCanceledException ============");
                 // Timeout síncrono do HttpClient
                 throw;
             }
             catch (InvalidOperationException)
             {
+                Debug.WriteLine("============ Exception: InvalidOperationException ============");
                 // HttpClient já disposado, endpoint vazio, etc.
                 throw;
             }
             catch (Exception)
             {
+                Debug.WriteLine("============ Exception: Exception ============");
                 // Qualquer outra exceção síncrona
                 // Não engolir - lançar para degradação
                 throw;
@@ -97,59 +103,105 @@ namespace CustomLogger.Sinks
             }
         }
 
-        //// Espelho assíncrono de Write - mesma semântica, versão async
-        //public Task WriteAsync(ILogEntry entry, CancellationToken cancellationToken = default)
-        //{
-        //    if (entry?.State == null)
-        //        return Task.CompletedTask;
+        // Espelho assíncrono de Write - mesma semântica, versão async
+        public Task WriteAsync(ILogEntry entry, CancellationToken cancellationToken = default)
+        {
+            if (entry?.State == null)
+                return Task.CompletedTask;
 
-        //    var json = _formatter.Format(entry);
-        //    if (string.IsNullOrWhiteSpace(json))
-        //        return Task.CompletedTask;
+            var json = _formatter.Format(entry);
+            if (string.IsNullOrWhiteSpace(json))
+                return Task.CompletedTask;
 
-        //    var request = new HttpRequestMessage(HttpMethod.Post, _endpoint)
-        //    {
-        //        Content = new StringContent(json, Encoding.UTF8, "application/json")
-        //    };
-        //    request.Headers.Add("Authorization", $"Api-Token {_apiToken}");
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, _endpoint)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                request.Headers.Add("Authorization", $"Api-Token {_apiToken}");
 
-        //    var sendTask = _httpClient.SendAsync(request, cancellationToken);
+                var sendTask = _httpClient.SendAsync(request, cancellationToken);
 
-        //    sendTask.ContinueWith(
-        //        t => { var _ = t.Exception; },
-        //        TaskContinuationOptions.OnlyOnFaulted |
-        //        TaskContinuationOptions.ExecuteSynchronously
-        //    );
+                sendTask.ContinueWith(
+                    t => { var _ = t.Exception; },
+                    TaskContinuationOptions.OnlyOnFaulted |
+                    TaskContinuationOptions.ExecuteSynchronously
+                );
 
-        //    return Task.CompletedTask;
-        //}
+                return Task.CompletedTask;
+            }
+            catch (HttpRequestException)
+            {
+                Debug.WriteLine("============ Exception: HttpRequestException ============");
 
+                // Exceção síncrona do SendAsync (endpoint inválido, rede, etc.)
+                // Deve ser lançada para DegradableLogSink marcar degradação
+                throw;
+            }
+            catch (TaskCanceledException)
+            {
+                Debug.WriteLine("============ Exception: TaskCanceledException ============");
+                // Timeout síncrono do HttpClient
+                throw;
+            }
+            catch (InvalidOperationException)
+            {
+                Debug.WriteLine("============ Exception: InvalidOperationException ============");
+                // HttpClient já disposado, endpoint vazio, etc.
+                throw;
+            }
+            catch (Exception)
+            {
+                Debug.WriteLine("============ Exception: Exception ============");
+                // Qualquer outra exceção síncrona
+                // Não engolir - lançar para degradação
+                throw;
+            }
+        }
 
-        //// Iteração simples sobre entries - não é batch HTTP real
-        //public void WriteBatch(IEnumerable<ILogEntry> entries)
-        //{
-        //    if (entries == null)
-        //        return;
+        // Iteração simples sobre entries - não é batch HTTP real
+        public void WriteBatch(IEnumerable<ILogEntry> entries)
+        {
+            Debug.WriteLine($"************* Executando WriteBatch *************");
 
-        //    // Chama Write para cada entry sequencialmente
-        //    foreach (var entry in entries)
-        //    {
-        //        Write(entry);
-        //    }
-        //}
+            if (entries == null)
+                return;
+            try
+            {
+                // Chama Write para cada entry sequencialmente
+                foreach (var entry in entries)
+                {
+                    Write(entry);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"============ Erro ao executar WriteBatchAsync: Exception: {ex.Message} ============");
+            }
 
-        //// Espelho assíncrono de WriteBatch - iteração sequencial
-        //public async Task WriteBatchAsync(IEnumerable<ILogEntry> entries, CancellationToken cancellationToken = default)
-        //{
-        //    if (entries == null)
-        //        return;
+        }
 
-        //    // Chama WriteAsync para cada entry sequencialmente
-        //    foreach (var entry in entries)
-        //    {
-        //        await WriteAsync(entry, cancellationToken);
-        //    }
-        //}
+        // Espelho assíncrono de WriteBatch - iteração sequencial
+        public async Task WriteBatchAsync(IEnumerable<ILogEntry> entries, CancellationToken cancellationToken = default)
+        {
+            Debug.WriteLine($"************* Executando WriteBatchAsync *************");
+
+            if (entries == null)
+                return;
+            try
+            {
+                // Chama WriteAsync para cada entry sequencialmente
+                foreach (var entry in entries)
+                {
+                    await WriteAsync(entry, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"============ Erro ao executar WriteBatchAsync: Exception: {ex.Message} ============");
+            }
+        }
 
         public void Dispose()
         {
