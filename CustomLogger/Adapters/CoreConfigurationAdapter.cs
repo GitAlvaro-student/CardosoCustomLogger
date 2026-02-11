@@ -107,10 +107,44 @@ namespace CustomLogger.Adapters
                     );
                 }
 
+                // Dynatrace
+                DynatraceSinkOptions dynatraceOptions = null;
+                var dynatraceSection = sinksSection.GetSection("Dynatrace");
+                if (dynatraceSection.Exists())
+                {
+                    bool? dynatraceEnabled = null;
+                    var dynatraceEnabledValue = dynatraceSection["Enabled"];
+                    if (!string.IsNullOrWhiteSpace(dynatraceEnabledValue) &&
+                        bool.TryParse(dynatraceEnabledValue, out var parsedDynatraceEnabled))
+                    {
+                        dynatraceEnabled = parsedDynatraceEnabled;
+                    }
+
+                    var endpoint = dynatraceSection["Endpoint"];
+                    var apiToken = dynatraceSection["ApiToken"];
+
+                    int? timeoutSeconds = null;
+                    var timeoutValue = dynatraceSection["TimeoutSeconds"];
+                    if (!string.IsNullOrWhiteSpace(timeoutValue) &&
+                        int.TryParse(timeoutValue, out var parsedTimeout))
+                    {
+                        timeoutSeconds = parsedTimeout;
+                    }
+
+                    dynatraceOptions = new DynatraceSinkOptions(
+                        dynatraceEnabled,
+                        endpoint,
+                        apiToken,
+                        timeoutSeconds
+                    );
+                }
+
+
                 sinkOptions = new SinkOptions(
                     consoleOptions,
                     fileOptions,
-                    blobOptions
+                    blobOptions,
+                    dynatraceOptions
                 );
             }
 

@@ -3,6 +3,7 @@ using CustomLogger.Configurations;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,6 +59,8 @@ namespace CustomLogger.Buffering
         /// </summary>
         public void Enqueue(ILogEntry entry)
         {
+            Debug.WriteLine("[Enqueue] >>> Iniciando Enqueue");
+
             // GUARD RAIL #1: Verificar se buffer está disposed
             // RFC: Hot path NUNCA lança exceção
             // RFC: Retorno silencioso se disposed
@@ -102,6 +105,8 @@ namespace CustomLogger.Buffering
         /// </summary>
         public async Task EnqueueAsync(ILogEntry entry, CancellationToken cancellationToken = default)
         {
+            Debug.WriteLine("[EnqueueAsync] >>> Iniciando EnqueueAsync");
+
             // GUARD RAIL: Idêntico a Enqueue()
             if (IsDisposed() || entry == null)
             {
@@ -115,6 +120,7 @@ namespace CustomLogger.Buffering
                 {
                     try
                     {
+                        Debug.WriteLine("[EnqueueAsync] >>> Iniciando WriteAsync");
                         await asyncSink.WriteAsync(entry, cancellationToken);
                     }
                     catch
@@ -143,6 +149,7 @@ namespace CustomLogger.Buffering
             // RFC: Flush automático ao atingir BatchSize
             if (_queue.Count >= _options.BatchOptions.BatchSize)
             {
+                Debug.WriteLine("[EnqueueAsync] >>> Iniciando FlushAsync por Atingir BatchSize");
                 await FlushAsync(cancellationToken);
             }
         }
@@ -158,6 +165,8 @@ namespace CustomLogger.Buffering
         /// </summary>
         public void Flush()
         {
+            Debug.WriteLine("[Flush] >>> Iniciando Flush");
+
             // ====================================================================
             // GUARD RAIL: Verificar se buffer está disposed
             // ====================================================================
@@ -219,6 +228,8 @@ namespace CustomLogger.Buffering
         /// <param name="batch">Batch de logs a processar</param>
         private void ProcessBatch(List<ILogEntry> batch)
         {
+            Debug.WriteLine("[ProcessBatch] >>> Iniciando ProcessBatch");
+
             // ====================================================================
             // ESTRATÉGIA 1: Tentar WriteBatch (se sink suportar)
             // ====================================================================
@@ -273,6 +284,8 @@ namespace CustomLogger.Buffering
         /// <param name="batch">Batch de logs a processar individualmente</param>
         private void ProcessIndividualLogs(List<ILogEntry> batch)
         {
+            Debug.WriteLine("[ProcessIndividualLogs] >>> Iniciando ProcessIndividualLogs");
+
             // ====================================================================
             // PROCESSAMENTO LOG POR LOG
             // ====================================================================
@@ -337,6 +350,8 @@ namespace CustomLogger.Buffering
         /// </summary>
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
+            Debug.WriteLine("[FlushAsync] >>> Iniciando FlushAsync");
+
             // ====================================================================
             // GUARD RAIL: Verificar se buffer está disposed
             // ====================================================================
@@ -389,6 +404,8 @@ namespace CustomLogger.Buffering
         /// </summary>
         public void Dispose()
         {
+            Debug.WriteLine("[Dispose] >>> Iniciando Dispose");
+
             // ====================================================================
             // GUARD RAIL: Idempotência
             // ====================================================================
