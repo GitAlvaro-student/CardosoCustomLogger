@@ -27,6 +27,16 @@ namespace CustomLogger.Configurations
         /// </summary>
         public int? MaxBufferSize { get; set; } = 1000;
 
+        /// <summary>
+        /// Nome do serviço para contexto de observabilidade.
+        /// </summary>
+        public string ServiceName { get; set; }
+
+        /// <summary>
+        /// Ambiente de execução (ex: Development, Production).
+        /// </summary>
+        public string Environment { get; set; }
+
         public BatchOptions BatchOptions { get; set; } = new BatchOptions(50, 5000);
     }
 }

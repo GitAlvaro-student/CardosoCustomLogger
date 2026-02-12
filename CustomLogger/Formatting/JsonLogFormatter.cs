@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CustomLogger.Formatting
 {
@@ -9,7 +10,8 @@ namespace CustomLogger.Formatting
     {
         private static readonly JsonSerializerOptions _options = new JsonSerializerOptions
         {
-            WriteIndented = false
+            WriteIndented = false,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
         public string Format(ILogEntry entry)
@@ -29,7 +31,12 @@ namespace CustomLogger.Formatting
                     message = entry.Message,
                     exception = FormatException(entry.Exception),
                     scopes = entry.Scopes,
-                    state = FormatState(entry.State)
+                    state = FormatState(entry.State),
+                    traceId = entry.TraceId,
+                    spanId = entry.SpanId,
+                    parentSpanId = entry.ParentSpanId,
+                    serviceName = entry.ServiceName,
+                    environment = entry.Environment,
                 }, _options);
             }
             catch

@@ -66,9 +66,7 @@ namespace CustomLogger.Tests.Formatting
             Assert.True(root.TryGetProperty("category", out _));
             Assert.True(root.TryGetProperty("eventId", out _));
             Assert.True(root.TryGetProperty("message", out _));
-            Assert.True(root.TryGetProperty("exception", out _));
             Assert.True(root.TryGetProperty("scopes", out _));
-            Assert.True(root.TryGetProperty("state", out _));
         }
 
         // ✅ Teste 4: Valores dos campos obrigatórios corretos
@@ -148,7 +146,7 @@ namespace CustomLogger.Tests.Formatting
 
         // ✅ Teste 8: Sem exception → campo nulo
         [Fact]
-        public void Format_SemException_CampoNulo()
+        public void Format_SemException_CampoAusente()
         {
             var formatter = new JsonLogFormatter();
             var entry = CriarEntry("Sem erro", exception: null);
@@ -156,7 +154,7 @@ namespace CustomLogger.Tests.Formatting
             var json = formatter.Format(entry);
             var doc = JsonDocument.Parse(json, _jsonOptions);
 
-            Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("exception").ValueKind);
+            Assert.False(doc.RootElement.TryGetProperty("exception", out _));
         }
 
         // ✅ Teste 9: Com exception → campos serializados
@@ -173,7 +171,6 @@ namespace CustomLogger.Tests.Formatting
 
             Assert.True(exceptionNode.TryGetProperty("type", out _));
             Assert.True(exceptionNode.TryGetProperty("message", out _));
-            Assert.True(exceptionNode.TryGetProperty("stackTrace", out _));
             Assert.Contains("InvalidOperationException", exceptionNode.GetProperty("type").GetString());
             Assert.Equal("Erro de teste", exceptionNode.GetProperty("message").GetString());
         }
@@ -270,7 +267,7 @@ namespace CustomLogger.Tests.Formatting
 
         // ✅ Teste 14: Sem state → campo nulo
         [Fact]
-        public void Format_SemState_CampoNulo()
+        public void Format_SemState_CampoAusente()
         {
             var formatter = new JsonLogFormatter();
             var entry = CriarEntry("Sem state", state: null);
@@ -278,7 +275,7 @@ namespace CustomLogger.Tests.Formatting
             var json = formatter.Format(entry);
             var doc = JsonDocument.Parse(json, _jsonOptions);
 
-            Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("state").ValueKind);
+            Assert.False(doc.RootElement.TryGetProperty("state", out _));
         }
 
         // ✅ Teste 15: Com state serializável → preservado
@@ -401,6 +398,219 @@ namespace CustomLogger.Tests.Formatting
             Assert.DoesNotContain("\n", json);
         }
 
+        // ✅ Teste 21: TraceId presente → serializado no JSON
+        [Fact]
+        public void Format_ComTraceId_TraceIdNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var traceId = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+            var entry = CriarEntry("Teste", traceId: traceId);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("traceId", out var traceIdProp));
+            Assert.Equal(traceId, traceIdProp.GetString());
+        }
+
+        // ✅ Teste 22: TraceId null → campo NÃO presente no JSON
+        [Fact]
+        public void Format_TraceIdNull_CampoAusenteNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry("Teste", traceId: null);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.False(doc.RootElement.TryGetProperty("traceId", out _));
+        }
+
+        // ✅ Teste 23: SpanId presente → serializado no JSON
+        [Fact]
+        public void Format_ComSpanId_SpanIdNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var spanId = "00f067aa0ba902b7";
+            var entry = CriarEntry("Teste", spanId: spanId);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("spanId", out var spanIdProp));
+            Assert.Equal(spanId, spanIdProp.GetString());
+        }
+
+        // ✅ Teste 24: SpanId null → campo NÃO presente no JSON
+        [Fact]
+        public void Format_SpanIdNull_CampoAusenteNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry("Teste", spanId: null);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.False(doc.RootElement.TryGetProperty("spanId", out _));
+        }
+
+        // ✅ Teste 25: ParentSpanId presente → serializado no JSON
+        [Fact]
+        public void Format_ComParentSpanId_ParentSpanIdNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var parentSpanId = "00f067aa0ba902b6";
+            var entry = CriarEntry("Teste", parentSpanId: parentSpanId);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("parentSpanId", out var parentSpanIdProp));
+            Assert.Equal(parentSpanId, parentSpanIdProp.GetString());
+        }
+
+        // ✅ Teste 26: ParentSpanId null → campo NÃO presente no JSON
+        [Fact]
+        public void Format_ParentSpanIdNull_CampoAusenteNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry("Teste", parentSpanId: null);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.False(doc.RootElement.TryGetProperty("parentSpanId", out _));
+        }
+
+        // ✅ Teste 27: Todos os campos de tracing presentes → serializados
+        [Fact]
+        public void Format_TodosTracingPresentes_TodosNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var traceId = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+            var spanId = "00f067aa0ba902b7";
+            var parentSpanId = "00f067aa0ba902b6";
+
+            var entry = CriarEntry("Teste", traceId: traceId, spanId: spanId, parentSpanId: parentSpanId);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("traceId", out var traceIdProp));
+            Assert.True(doc.RootElement.TryGetProperty("spanId", out var spanIdProp));
+            Assert.True(doc.RootElement.TryGetProperty("parentSpanId", out var parentSpanIdProp));
+            Assert.Equal(traceId, traceIdProp.GetString());
+            Assert.Equal(spanId, spanIdProp.GetString());
+            Assert.Equal(parentSpanId, parentSpanIdProp.GetString());
+        }
+
+        // ────────────────────────────────────────
+        // Testes de Contexto - ServiceName, Environment
+        // ────────────────────────────────────────
+
+        // ✅ Teste 28: ServiceName presente → serializado no JSON
+        [Fact]
+        public void Format_ComServiceName_ServiceNameNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var serviceName = "MeuServico";
+            var entry = CriarEntry("Teste", serviceName: serviceName);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("serviceName", out var serviceNameProp));
+            Assert.Equal(serviceName, serviceNameProp.GetString());
+        }
+
+        // ✅ Teste 29: ServiceName null → campo NÃO presente no JSON
+        [Fact]
+        public void Format_ServiceNameNull_CampoAusenteNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry("Teste", serviceName: null);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.False(doc.RootElement.TryGetProperty("serviceName", out _));
+        }
+
+        // ✅ Teste 30: Environment presente → serializado no JSON
+        [Fact]
+        public void Format_ComEnvironment_EnvironmentNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var environment = "Production";
+            var entry = CriarEntry("Teste", environment: environment);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("environment", out var environmentProp));
+            Assert.Equal(environment, environmentProp.GetString());
+        }
+
+        // ✅ Teste 31: Environment null → campo NÃO presente no JSON
+        [Fact]
+        public void Format_EnvironmentNull_CampoAusenteNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry("Teste", environment: null);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.False(doc.RootElement.TryGetProperty("environment", out _));
+        }
+
+        // ✅ Teste 32: ServiceName e Environment presentes → serializados
+        [Fact]
+        public void Format_ContextoCompleto_AmbosNoJson()
+        {
+            var formatter = new JsonLogFormatter();
+            var serviceName = "MeuServico";
+            var environment = "Production";
+
+            var entry = CriarEntry("Teste", serviceName: serviceName, environment: environment);
+
+            var json = formatter.Format(entry);
+            var doc = JsonDocument.Parse(json, _jsonOptions);
+
+            Assert.True(doc.RootElement.TryGetProperty("serviceName", out var serviceNameProp));
+            Assert.True(doc.RootElement.TryGetProperty("environment", out var environmentProp));
+            Assert.Equal(serviceName, serviceNameProp.GetString());
+            Assert.Equal(environment, environmentProp.GetString());
+        }
+
+        // ✅ Teste 33: Log completo com tracing e contexto → JSON válido
+        [Fact]
+        public void Format_LogCompletoComTracingEContexto_JsonValido()
+        {
+            var formatter = new JsonLogFormatter();
+            var entry = CriarEntry(
+                message: "Teste completo",
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+                spanId: "00f067aa0ba902b7",
+                parentSpanId: "00f067aa0ba902b6",
+                serviceName: "MeuServico",
+                environment: "Production"
+            );
+
+            var json = formatter.Format(entry);
+
+            // Deve parsear sem exceção
+            using var doc = JsonDocument.Parse(json, _jsonOptions);
+            Assert.Equal(JsonValueKind.Object, doc.RootElement.ValueKind);
+
+            // Validar todos os campos presentes
+            Assert.True(doc.RootElement.TryGetProperty("traceId", out _));
+            Assert.True(doc.RootElement.TryGetProperty("spanId", out _));
+            Assert.True(doc.RootElement.TryGetProperty("parentSpanId", out _));
+            Assert.True(doc.RootElement.TryGetProperty("serviceName", out _));
+            Assert.True(doc.RootElement.TryGetProperty("environment", out _));
+        }
+
         // ────────────────────────────────────────
         // Helpers
         // ────────────────────────────────────────
@@ -420,7 +630,12 @@ namespace CustomLogger.Tests.Formatting
             EventId? eventId = null,
             Exception exception = null,
             object state = null,
-            IReadOnlyDictionary<string, object> scopes = null)
+            IReadOnlyDictionary<string, object> scopes = null,
+            string traceId = null,
+            string spanId = null,
+            string parentSpanId = null,
+            string serviceName = null,
+            string environment = null)
         {
             return new BufferedLogEntry(
                 timestamp: timestamp ?? DateTimeOffset.UtcNow,
@@ -430,7 +645,12 @@ namespace CustomLogger.Tests.Formatting
                 message: message,
                 exception: exception,
                 state: state,
-                scopes: scopes ?? new Dictionary<string, object>()
+                scopes: scopes ?? new Dictionary<string, object>(),
+                traceId: traceId,
+                spanId: spanId,
+                parentSpanId: parentSpanId,
+                serviceName: serviceName,
+                environment: environment
             );
         }
     }
