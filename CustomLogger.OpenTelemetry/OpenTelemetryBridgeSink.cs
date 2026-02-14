@@ -9,7 +9,7 @@ namespace CustomLogger.OpenTelemetry
 {
     /// <summary>
     /// Sink que faz bridge entre CustomLogger e OpenTelemetry.
-    /// Converte ILogEntry em eventos de Activity do OpenTelemetry.
+    /// Adiciona eventos à Activity.Current quando disponível.
     /// </summary>
     public sealed class OpenTelemetryBridgeSink : ILogSink
     {
@@ -20,6 +20,9 @@ namespace CustomLogger.OpenTelemetry
         /// <param name="entry">Entrada de log.</param>
         public void Write(ILogEntry entry)
         {
+            if (entry == null)
+                return;
+
             var activity = Activity.Current;
 
             if (activity != null)
