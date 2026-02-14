@@ -14,6 +14,7 @@
     <File Path="CustomLogger/planejamento_arquitetural_evolucao_do_custom_logger - Copy.md" />
   </Folder>
   <Project Path="CommerceConsoleApp/CommerceConsoleApp.csproj" />
+  <Project Path="CustomLogger.OpenTelemetry/CustomLogger.OpenTelemetry.csproj" Id="7aacae0c-c39b-4b54-be6e-6d58a52f064a" />
   <Project Path="CustomLogger.Tests/CustomLogger.Tests.csproj" Id="fb43802b-87a0-4003-8c0c-5f2eb18c615a" />
   <Project Path="CustomLogger/CustomLogger.csproj" />
 </Solution>
