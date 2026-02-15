@@ -1,4 +1,5 @@
-﻿using CustomLogger.Abstractions;
+﻿
+using CustomLogger.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.IO;

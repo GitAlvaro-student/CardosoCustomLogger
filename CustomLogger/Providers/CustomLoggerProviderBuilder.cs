@@ -126,6 +126,12 @@ namespace CustomLogger.Providers
 
             var effectiveMinimumLevel =
                 _loggingOptions.MinimumLogLevel ?? LogLevel.Information;
+            
+            var effectiveServiceName =
+                _loggingOptions.ServiceName ?? "";
+
+            var effectiveEnvironment =
+                _loggingOptions.Environment ?? "";
 
             var effectiveBufferOptions =
                 _loggingOptions.BufferOptions ?? new BufferOptions(
@@ -179,6 +185,8 @@ namespace CustomLogger.Providers
 
             _loggingOptions = new LoggingOptions(
                 minimumLogLevel: effectiveMinimumLevel,
+                serviceName: effectiveServiceName,
+                environment: effectiveEnvironment,
                 bufferOptions: effectiveBufferOptions,
                 batchOptions: effectiveBatchOptions,
                 sinkOptions: effectiveSinkOptions
@@ -192,6 +200,15 @@ namespace CustomLogger.Providers
         {
             if (_validated)
                 return;
+
+            // Validação de ServiceName e Environment
+            var serviceName = _loggingOptions.ServiceName;
+            if (string.IsNullOrWhiteSpace(serviceName)) throw new InvalidOperationException("ServiceName não pode ser Nulo! Ajuste o Nome do Serviço" +
+                " no appSetting.json ou web.config." );
+
+            var envName = _loggingOptions.Environment;
+            if (string.IsNullOrWhiteSpace(envName)) throw new InvalidOperationException("Environment não pode ser Nulo! Ajuste o Environment" +
+                " no appSetting.json ou web.config.");
 
             // Validação de configuração
             var buffer = _loggingOptions.BufferOptions;
@@ -271,7 +288,9 @@ namespace CustomLogger.Providers
         {
             var options = new CustomProviderOptions
             {
-                MinimumLogLevel = _loggingOptions.MinimumLogLevel.Value
+                MinimumLogLevel = _loggingOptions.MinimumLogLevel.Value,
+                ServiceName = _loggingOptions.ServiceName,
+                Environment = _loggingOptions.Environment
             };
 
             if (_loggingOptions.BufferOptions != null && _loggingOptions.BufferOptions.Enabled.Value)

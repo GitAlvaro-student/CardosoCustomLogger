@@ -29,6 +29,26 @@ namespace CustomLogger.Adapters
                 }
             }
 
+            // ServiceName
+            string serviceName = null;
+            var servNameKey = "CustomLogger:ServiceName";
+            var servNameValue = appSettings[servNameKey];
+            if (!string.IsNullOrWhiteSpace(servNameValue))
+            {
+                serviceName = servNameValue;
+            }
+            else throw new ConfigurationErrorsException($"Valor ausente para '{servNameKey}': '{servNameValue}'. Esperado um valor para ServiceName.");
+
+            // Environment
+            string environment = null;
+            var envKey = "CustomLogger:Environment";
+            var envValue = appSettings[envKey];
+            if (!string.IsNullOrWhiteSpace(envValue))
+            {
+                environment = envValue;
+            }
+            else throw new ConfigurationErrorsException($"Valor ausente para '{envKey}': '{envValue}'. Esperado um valor para Environment.");
+
             // BufferOptions
             BufferOptions bufferOptions = null;
 
@@ -242,6 +262,8 @@ namespace CustomLogger.Adapters
 
             return new LoggingOptions(
                     minimumLogLevel,
+                    serviceName,
+                    environment,
                     bufferOptions,
                     batchOptions,
                     sinkOptions

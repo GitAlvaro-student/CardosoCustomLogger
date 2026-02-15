@@ -1,14 +1,15 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CustomLogger.OpenTelemetry;
+using CustomLogger.Providers;
+using Microsoft.Extensions.Logging;
 using PaymentAPI.Services;
 using System.Web.Http;
 using Unity;
 using Unity.AspNet.WebApi;
-using CustomLogger.Providers;
 
 namespace PaymentAPI
 {
     public class WebApiApplication : System.Web.HttpApplication
-    { 
+    {
         protected void Application_Start()
         {
             GlobalConfiguration.Configure(WebApiConfig.Register);
@@ -23,6 +24,14 @@ namespace PaymentAPI
 
             // Logging
             Global.LoggerFactory = LoggerFactory.Create(builder => builder.AddCustomLogging());
+
+            // OpenTelemetry
+            OpenTelemetryBootstrapper.InitializeFromConfig();
+        }
+
+        protected void Application_End()
+        {
+            OpenTelemetryBootstrapper.Shutdown();
         }
 
         public static class Global

@@ -11,7 +11,9 @@ namespace CustomLogger.Buffering
     /// </summary>
     public sealed class BufferedLogEntry : ILogEntry
     {
-        public BufferedLogEntry(DateTimeOffset timestamp, string category, LogLevel logLevel, EventId eventId, string message, Exception exception, object state, IReadOnlyDictionary<string, object> scopes)
+        public BufferedLogEntry(DateTimeOffset timestamp, string category, LogLevel logLevel, EventId eventId,
+            string message, Exception exception, object state, IReadOnlyDictionary<string, object> scopes,
+            string traceId = null, string spanId = null, string parentSpanId = null, string serviceName = null, string environment = null)
         {
             Timestamp = timestamp;
             Category = category;
@@ -21,6 +23,11 @@ namespace CustomLogger.Buffering
             Exception = exception;
             State = state;
             Scopes = scopes ?? new Dictionary<string, object>();
+            TraceId = traceId;
+            SpanId = spanId;
+            ParentSpanId = parentSpanId;
+            ServiceName = serviceName;
+            Environment = environment;
         }
 
         public DateTimeOffset Timestamp { get; set; }
@@ -38,6 +45,11 @@ namespace CustomLogger.Buffering
         public object State { get; set; }
 
         public IReadOnlyDictionary<string, object> Scopes { get; }
+        public string TraceId { get; }
+        public string SpanId { get; }
+        public string ParentSpanId { get; }
+        public string ServiceName { get; }
+        public string Environment { get; }
 
     }
 }

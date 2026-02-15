@@ -17,5 +17,10 @@ namespace CustomLogger.Models
         public string Message { get; set; }
         public Exception Exception { get; set; }
         public object State { get; set; }
+        public string TraceId { get; set; }
+        public string SpanId { get; set; }
+        public string ParentSpanId { get; set; }
+        public string ServiceName { get; set; }
+        public string Environment { get; set; }
     }
 }

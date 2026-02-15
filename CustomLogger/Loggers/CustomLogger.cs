@@ -76,6 +76,16 @@ namespace CustomLogger.Loggers
 
             var message = formatter(state, exception);
 
+            // Captura do Activity.Current para obter informações de tracing
+            var activity = Activity.Current;
+            var traceId = activity?.TraceId.ToString();
+            var spanId = activity?.SpanId.ToString();
+            var parentSpanId = activity?.ParentSpanId.ToString();
+
+            // Obter ServiceName e Environment da configuração
+            var serviceName = _configuration.Options.ServiceName;
+            var environment = _configuration.Options.Environment;
+
             // Neste ponto, apenas estruturamos o evento.
             // A escrita real será responsabilidade do buffer/sink futuramente.
             var entry = new BufferedLogEntry(
@@ -86,7 +96,12 @@ namespace CustomLogger.Loggers
                 message,
                 exception,
                 state,
-                _logScopeProvider.GetScopes()
+                _logScopeProvider.GetScopes(),
+                traceId,
+                spanId,
+                parentSpanId,
+                serviceName,
+                environment
             );
 
             _buffer.EnqueueAsync(entry);

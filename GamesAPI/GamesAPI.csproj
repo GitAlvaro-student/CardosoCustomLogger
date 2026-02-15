@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CustomLogger.OpenTelemetry\CustomLogger.OpenTelemetry.csproj" />
     <ProjectReference Include="..\CustomLogger\CustomLogger.csproj" />
   </ItemGroup>
 

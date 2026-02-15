@@ -60,23 +60,31 @@ namespace CustomLogger.Tests.Sinks
 
         private class TestLogEntry : ILogEntry
         {
-            public string Message { get; set; }
-            public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-            public string LogLevel { get; set; } = "Info";
+            public DateTimeOffset Timestamp { get; set; }
 
             public string Category { get; set; }
 
+            public LogLevel LogLevel { get; set; }
+
             public EventId EventId { get; set; }
+
+            public string Message { get; set; }
 
             public Exception Exception { get; set; }
 
             public object State { get; set; }
 
-            public IReadOnlyDictionary<string, object> Scopes { get; set; }
+            public IReadOnlyDictionary<string, object> Scopes { get; }
 
-            DateTimeOffset ILogEntry.Timestamp => Timestamp;
+            public string TraceId { get; }
 
-            LogLevel ILogEntry.LogLevel { get; }
+            public string SpanId { get; }
+
+            public string ParentSpanId { get; }
+
+            public string ServiceName { get; }
+
+            public string Environment { get; }
         }
 
         #endregion

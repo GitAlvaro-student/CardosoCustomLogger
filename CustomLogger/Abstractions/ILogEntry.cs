@@ -15,5 +15,10 @@ namespace CustomLogger.Abstractions
         Exception Exception { get; }
         object State { get; }
         IReadOnlyDictionary<string, object> Scopes { get; }
+        string TraceId { get; }
+        string SpanId { get; }
+        string ParentSpanId { get; }
+        string ServiceName { get; }
+        string Environment { get; }
     }
 }

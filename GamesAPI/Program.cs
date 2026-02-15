@@ -1,5 +1,6 @@
 using GamesAPI.Services;
 using CustomLogger.Providers;
+using CustomLogger.OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddCustomLogging(builder.Configuration);
+builder.Services.AddCustomLoggerOpenTelemetry(builder.Configuration);
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

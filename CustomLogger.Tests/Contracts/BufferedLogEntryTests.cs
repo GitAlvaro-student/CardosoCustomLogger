@@ -132,6 +132,116 @@ namespace CustomLogger.Tests.Contracts
             Assert.IsAssignableFrom<IReadOnlyDictionary<string, object>>(entry.Scopes);
         }
 
+        // ✅ Teste 11: Propriedades de tracing quando não fornecidas → null
+        [Fact]
+        public void BufferedLogEntry_SemTracing_PropriedadesNull()
+        {
+            var entry = CriarEntry();
+
+            Assert.Null(entry.TraceId);
+            Assert.Null(entry.SpanId);
+            Assert.Null(entry.ParentSpanId);
+        }
+
+        // ✅ Teste 12: TraceId fornecido → preservado
+        [Fact]
+        public void BufferedLogEntry_ComTraceId_PreservaTraceId()
+        {
+            var traceId = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+            var entry = CriarEntry(traceId: traceId);
+
+            Assert.Equal(traceId, entry.TraceId);
+        }
+
+        // ✅ Teste 13: SpanId fornecido → preservado
+        [Fact]
+        public void BufferedLogEntry_ComSpanId_PreservaSpanId()
+        {
+            var spanId = "00f067aa0ba902b7";
+            var entry = CriarEntry(spanId: spanId);
+
+            Assert.Equal(spanId, entry.SpanId);
+        }
+
+        // ✅ Teste 14: ParentSpanId fornecido → preservado
+        [Fact]
+        public void BufferedLogEntry_ComParentSpanId_PreservaParentSpanId()
+        {
+            var parentSpanId = "00f067aa0ba902b6";
+            var entry = CriarEntry(parentSpanId: parentSpanId);
+
+            Assert.Equal(parentSpanId, entry.ParentSpanId);
+        }
+
+        // ✅ Teste 15: Todos os campos de tracing fornecidos → preservados
+        [Fact]
+        public void BufferedLogEntry_ComTodosTracing_PreservaTodos()
+        {
+            var traceId = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+            var spanId = "00f067aa0ba902b7";
+            var parentSpanId = "00f067aa0ba902b6";
+
+            var entry = CriarEntry(
+                traceId: traceId,
+                spanId: spanId,
+                parentSpanId: parentSpanId
+            );
+
+            Assert.Equal(traceId, entry.TraceId);
+            Assert.Equal(spanId, entry.SpanId);
+            Assert.Equal(parentSpanId, entry.ParentSpanId);
+        }
+
+        // ────────────────────────────────────────
+        // Testes de Contexto (ServiceName, Environment)
+        // ────────────────────────────────────────
+
+        // ✅ Teste 16: ServiceName e Environment quando não fornecidos → null
+        [Fact]
+        public void BufferedLogEntry_SemContexto_PropriedadesNull()
+        {
+            var entry = CriarEntry();
+
+            Assert.Null(entry.ServiceName);
+            Assert.Null(entry.Environment);
+        }
+
+        // ✅ Teste 17: ServiceName fornecido → preservado
+        [Fact]
+        public void BufferedLogEntry_ComServiceName_PreservaServiceName()
+        {
+            var serviceName = "MeuServico";
+            var entry = CriarEntry(serviceName: serviceName);
+
+            Assert.Equal(serviceName, entry.ServiceName);
+        }
+
+        // ✅ Teste 18: Environment fornecido → preservado
+        [Fact]
+        public void BufferedLogEntry_ComEnvironment_PreservaEnvironment()
+        {
+            var environment = "Production";
+            var entry = CriarEntry(environment: environment);
+
+            Assert.Equal(environment, entry.Environment);
+        }
+
+        // ✅ Teste 19: ServiceName e Environment fornecidos → preservados
+        [Fact]
+        public void BufferedLogEntry_ComContextoCompleto_PreservaContexto()
+        {
+            var serviceName = "MeuServico";
+            var environment = "Production";
+
+            var entry = CriarEntry(
+                serviceName: serviceName,
+                environment: environment
+            );
+
+            Assert.Equal(serviceName, entry.ServiceName);
+            Assert.Equal(environment, entry.Environment);
+        }
+
         // ────────────────────────────────────────
         // Helper
         // ────────────────────────────────────────
@@ -143,7 +253,12 @@ namespace CustomLogger.Tests.Contracts
             string message = "Test message",
             Exception exception = null,
             object state = null,
-            IReadOnlyDictionary<string, object> scopes = null)
+            IReadOnlyDictionary<string, object> scopes = null,
+            string traceId = null,
+            string spanId = null,
+            string parentSpanId = null,
+            string serviceName = null,
+            string environment = null)
         {
             return new BufferedLogEntry(
                 timestamp: timestamp ?? DateTimeOffset.UtcNow,
@@ -153,7 +268,12 @@ namespace CustomLogger.Tests.Contracts
                 message: message,
                 exception: exception,
                 state: state,
-                scopes: scopes ?? new Dictionary<string, object>()
+                scopes: scopes ?? new Dictionary<string, object>(),
+                traceId: traceId,
+                spanId: spanId,
+                parentSpanId: parentSpanId,
+                serviceName: serviceName,
+                environment: environment
             );
         }
     }

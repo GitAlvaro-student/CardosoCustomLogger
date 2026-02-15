@@ -26,6 +26,20 @@ namespace CustomLogger.Adapters
                 }
             }
 
+            string serviceName = null;
+            var servName = section["ServiceName"];
+            if (!string.IsNullOrWhiteSpace(servName))
+            {
+                serviceName = servName;
+            }
+
+            string environment = null;
+            var env = section["Environment"];
+            if (!string.IsNullOrWhiteSpace(env))
+            {
+                environment = env;
+            }
+
             // BufferOptions
             BufferOptions bufferOptions = null;
             var bufferSection = section.GetSection("Buffer");
@@ -171,6 +185,8 @@ namespace CustomLogger.Adapters
 
             return new LoggingOptions(
                     minimumLogLevel,
+                    serviceName,
+                    environment,
                     bufferOptions,
                     batchOptions,
                     sinkOptions
