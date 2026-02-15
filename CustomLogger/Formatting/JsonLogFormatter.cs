@@ -24,6 +24,11 @@ namespace CustomLogger.Formatting
                 return JsonSerializer.Serialize(new
                 {
                     timestamp = entry.Timestamp,
+                    serviceName = entry.ServiceName,
+                    environment = entry.Environment,
+                    traceId = entry.TraceId,
+                    spanId = entry.SpanId,
+                    parentSpanId = entry.ParentSpanId,
                     level = entry.LogLevel.ToString(),
                     category = entry.Category,
                     eventId = entry.EventId.Id,
@@ -32,11 +37,6 @@ namespace CustomLogger.Formatting
                     exception = FormatException(entry.Exception),
                     scopes = entry.Scopes,
                     state = FormatState(entry.State),
-                    traceId = entry.TraceId,
-                    spanId = entry.SpanId,
-                    parentSpanId = entry.ParentSpanId,
-                    serviceName = entry.ServiceName,
-                    environment = entry.Environment,
                 }, _options);
             }
             catch

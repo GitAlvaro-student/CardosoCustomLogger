@@ -14,6 +14,16 @@ namespace CustomLogger.Configurations
         public LogLevel? MinimumLogLevel { get; }
 
         /// <summary>
+        /// Nome do Serviço que utiliza o CustomLogger.
+        /// </summary>
+        public string ServiceName { get; }
+
+        /// <summary>
+        /// Ambiente em que a aplicação está sendo executada.
+        /// </summary>
+        public string Environment { get; }
+
+        /// <summary>
         /// Configurações do buffer de logs em memória.
         /// Padrão: Enabled=true, MaxSize=50
         /// </summary>
@@ -33,11 +43,15 @@ namespace CustomLogger.Configurations
 
         public LoggingOptions(
         LogLevel? minimumLogLevel = null,
+        string serviceName = null,
+        string environment = null,
         BufferOptions bufferOptions = null,
         BatchOptions batchOptions = null,
         SinkOptions sinkOptions = null)
         {
             MinimumLogLevel = minimumLogLevel;
+            ServiceName = serviceName;
+            Environment = environment;
             BufferOptions = bufferOptions;
             BatchOptions = batchOptions;
             SinkOptions = sinkOptions;

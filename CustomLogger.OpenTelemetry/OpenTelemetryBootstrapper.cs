@@ -59,10 +59,10 @@ namespace CustomLogger.OpenTelemetry
                 {
                     switch (options.Exporter.ToLowerInvariant())
                     {
-                        case "otlp":
+                        case "Otlp":
                             builder.AddOtlpExporter();
                             break;
-                        case "console":
+                        case "Console":
                             builder.AddConsoleExporter();
                             break;
                     }
