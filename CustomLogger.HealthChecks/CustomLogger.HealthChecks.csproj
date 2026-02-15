@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<RootNamespace>CustomLogger.HealthChecks</RootNamespace>
+
+		<AssemblyName>CustomLogger.HealthChecks</AssemblyName>
+		<AssemblyTitle>CustomLogger Health Monitoring</AssemblyTitle>
+		<Description>Health check system for CustomLogger - observes logger state without writing logs</Description>
+		<Version>1.0.0</Version>
+
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\CustomLogger\CustomLogger.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Abstractions\" />
+	  <Folder Include="Models\" />
+	  <Folder Include="Checks\" />
+	  <Folder Include="Collectors\" />
+	</ItemGroup>
+</Project>

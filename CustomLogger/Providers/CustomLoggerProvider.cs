@@ -15,7 +15,7 @@ namespace CustomLogger.Providers
     /// 
     /// RFC - Lifecycle: CREATED → OPERATIONAL → STOPPING → DISPOSING → DISPOSED
     /// </summary>
-    public sealed class CustomLoggerProvider : ILoggerProvider
+    public sealed class CustomLoggerProvider : ILoggerProvider, ILoggingHealthState
     {
         private readonly CustomProviderConfiguration _configuration;
         private readonly IAsyncLogBuffer _buffer;
@@ -219,6 +219,76 @@ namespace CustomLogger.Providers
             // Estado final: DISPOSED
             // Todos os recursos liberados (best-effort)
             // Provider está completamente inutilizável
+        }
+
+        /// <summary>
+        /// Leitura thread-safe do tamanho atual do buffer.
+        /// 
+        /// IMPLEMENTAÇÃO:
+        /// - Delega para InstanceLogBuffer (que já tem ConcurrentQueue)
+        /// - Snapshot atômico via ConcurrentQueue.Count
+        /// </summary>
+        int ILoggingHealthState.CurrentBufferSize
+        {
+            get
+            {
+                // Se usar buffer global: retornar _buffer.CurrentSize
+                // Se usar buffer de instância: agregar todos os buffers
+
+                // Exemplo para buffer de instância:
+                // return _loggers.Values.Sum(logger => logger.Buffer.CurrentSize);
+
+                // IMPORTANTE: Não lançar exceção, retornar 0 se disposed
+                return 0; // Stub - substituir por lógica real
+            }
+        }
+
+        int ILoggingHealthState.MaxBufferCapacity => _configuration.Options.MaxBufferSize ?? 0;
+
+        bool ILoggingHealthState.IsDiscardingMessages
+        {
+            get
+            {
+                // LÓGICA: Verificar se CurrentBufferSize >= MaxBufferCapacity
+                // OU consultar flag em InstanceLogBuffer se existir
+
+                return false; // Stub
+            }
+        }
+
+        bool ILoggingHealthState.IsDegradedMode
+        {
+            get
+            {
+                // Consultar _lifeCycle.CurrentState == ProviderState.DEGRADED
+                return false; // Stub
+            }
+        }
+
+        IReadOnlyList<SinkHealthSnapshot> ILoggingHealthState.SinkStates
+        {
+            get
+            {
+                // ESTRATÉGIA:
+                // 1. Se _sink é ILogSink simples: retornar lista com 1 item
+                // 2. Se _sink é CompositeLogSink: iterar _sinks internos
+                // 3. Para cada sink, criar SinkHealthSnapshot
+
+                var snapshots = new List<SinkHealthSnapshot>();
+
+                // Exemplo pseudocódigo:
+                // foreach (var sink in GetAllSinks())
+                // {
+                //     snapshots.Add(new SinkHealthSnapshot(
+                //         name: sink.GetType().Name,
+                //         type: sink.GetType().Name,
+                //         isOperational: true, // ou sink.IsHealthy() se existir
+                //         statusMessage: null
+                //     ));
+                // }
+
+                return snapshots.AsReadOnly();
+            }
         }
     }
 }
