@@ -13,22 +13,21 @@ namespace CustomLogger.HealthChecks
     /// <summary>
     /// Implementação padrão do avaliador de saúde do logger.
     /// 
-    /// DESIGN:
-    /// - Stateless (sem campos mutáveis)
-    /// - Thread-safe por design
-    /// - Thresholds fixos (não configuráveis nesta versão)
-    /// - Proteção defensiva contra exceções
-    /// 
-    /// REGRAS DE AVALIAÇÃO (v1.0):
+    /// REGRAS (v1.0):
     /// - Buffer &lt; 80% → Healthy
     /// - Buffer ≥ 80% → Degraded
     /// - Buffer = 100% (descartando) → Unhealthy
     /// - Sink em fallback → Degraded
-    /// - Sink falhando (LastSuccessfulWrite &gt; 5min) → Unhealthy
-    /// - Modo degradado ativo → Degraded
+    /// - Sink não-operacional → Unhealthy
+    /// - Sink sem escrita há &gt; 5min → Unhealthy
+    /// - Modo degradado ativo → Degraded (nunca Healthy)
     /// 
-    /// FUTURO:
-    /// Thresholds configuráveis via options pattern (sem quebrar compatibilidade).
+    /// AGREGAÇÃO:
+    /// Pior caso vence: Unhealthy &gt; Degraded &gt; Unknown &gt; Healthy
+    /// 
+    /// IMPORTANTE:
+    /// Leituras de estado são best-effort (snapshot pontual).
+    /// Pequenas inconsistências entre propriedades são aceitáveis.
     /// </summary>
     public sealed class DefaultLoggingHealthEvaluator : ILoggingHealthEvaluator
     {
@@ -46,85 +45,82 @@ namespace CustomLogger.HealthChecks
         /// </summary>
         public LoggingHealthReport Evaluate(ILoggingHealthState state)
         {
-            var stopwatch = Stopwatch.StartNew();
-
             try
             {
-                // GUARD: Estado null
+                // Guard: estado null
                 if (state == null)
                 {
-                    return LoggingHealthReport.Unknown(
-                        "ILoggingHealthState is null",
-                        stopwatch.Elapsed.TotalMilliseconds
-                    );
+                    return LoggingHealthReport.CreateUnknown("ILoggingHealthState is null");
                 }
 
-                // Coletar issues de todos os checks
                 var issues = new List<HealthIssue>();
+                var sinkStatuses = new Dictionary<string, LoggingHealthStatus>();
 
-                // Check 1: Buffer
+                // Executar checks individuais
                 var bufferStatus = EvaluateBuffer(state, issues);
-
-                // Check 2: Sinks
-                var sinksStatus = EvaluateSinks(state, issues);
-
-                // Check 3: Modo Degradado
+                var sinksStatus = EvaluateSinks(state, issues, sinkStatuses);
                 var degradedModeStatus = EvaluateDegradedMode(state, issues);
 
-                // Agregação: pior caso vence
+                // Agregar: pior caso vence
                 var overallStatus = AggregateStatuses(bufferStatus, sinksStatus, degradedModeStatus);
 
-                stopwatch.Stop();
+                // Calcular percentual de uso do buffer
+                var bufferUsagePercentage = CalculateBufferUsagePercentage(state);
 
                 return new LoggingHealthReport(
                     status: overallStatus,
                     issues: issues.AsReadOnly(),
-                    evaluationDurationMs: stopwatch.Elapsed.TotalMilliseconds,
+                    sinkStatuses: sinkStatuses,
+                    bufferUsagePercentage: bufferUsagePercentage,
                     evaluatedAtUtc: DateTime.UtcNow
                 );
             }
             catch (Exception ex)
             {
                 // Fallback defensivo: nunca propagar exceção
-                stopwatch.Stop();
-
-                return LoggingHealthReport.Unknown(
-                    $"Health evaluation failed: {ex.GetType().Name} - {ex.Message}",
-                    stopwatch.Elapsed.TotalMilliseconds
+                return LoggingHealthReport.CreateUnknown(
+                    $"Health evaluation failed: {ex.GetType().Name} - {ex.Message}"
                 );
             }
         }
 
+        #region Buffer Check
+
         /// <summary>
-        /// Avalia estado do buffer.
+        /// CHECK 1: Avalia estado do buffer.
         /// 
         /// REGRAS:
         /// - Descartando mensagens → Unhealthy
+        /// - Buffer ≥ 100% → Unhealthy
         /// - Buffer ≥ 80% → Degraded
         /// - Buffer &lt; 80% → Healthy
+        /// 
+        /// PROTEÇÃO:
+        /// - Capacidade &lt;= 0 → Unknown
+        /// - Tamanho &lt; 0 → Unknown
         /// </summary>
         private LoggingHealthStatus EvaluateBuffer(ILoggingHealthState state, List<HealthIssue> issues)
         {
             try
             {
-                // Proteção: capacidade zero (configuração inválida)
+                // Validação: capacidade inválida
                 if (state.MaxBufferCapacity <= 0)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Buffer",
-                        severity: LoggingHealthStatus.Unknown,
-                        description: "Invalid buffer configuration (MaxBufferCapacity <= 0)"
+                        "Buffer",
+                        LoggingHealthStatus.Unknown,
+                        "Invalid buffer configuration (MaxBufferCapacity <= 0)"
                     ));
                     return LoggingHealthStatus.Unknown;
                 }
 
-                // Proteção: tamanho negativo (estado inconsistente)
+                // Validação: tamanho negativo
                 if (state.CurrentBufferSize < 0)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Buffer",
-                        severity: LoggingHealthStatus.Unknown,
-                        description: "Invalid buffer state (CurrentBufferSize < 0)"
+                        "Buffer",
+                        LoggingHealthStatus.Unknown,
+                        "Invalid buffer state (CurrentBufferSize < 0)"
                     ));
                     return LoggingHealthStatus.Unknown;
                 }
@@ -132,35 +128,35 @@ namespace CustomLogger.HealthChecks
                 // Calcular percentual de ocupação
                 double fillPercentage = (double)state.CurrentBufferSize / state.MaxBufferCapacity;
 
-                // REGRA 1: Buffer descartando mensagens
+                // REGRA 1: Buffer descartando mensagens (crítico)
                 if (state.IsDiscardingMessages)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Buffer",
-                        severity: LoggingHealthStatus.Unhealthy,
-                        description: $"Buffer is discarding messages (size: {state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
+                        "Buffer",
+                        LoggingHealthStatus.Unhealthy,
+                        $"Buffer is discarding messages (size: {state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
                     ));
                     return LoggingHealthStatus.Unhealthy;
                 }
 
-                // REGRA 2: Buffer em capacidade máxima (mesmo sem descartar ainda)
+                // REGRA 2: Buffer em capacidade máxima (crítico)
                 if (fillPercentage >= UnhealthyBufferThreshold)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Buffer",
-                        severity: LoggingHealthStatus.Unhealthy,
-                        description: $"Buffer is full ({state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
+                        "Buffer",
+                        LoggingHealthStatus.Unhealthy,
+                        $"Buffer is full ({state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
                     ));
                     return LoggingHealthStatus.Unhealthy;
                 }
 
-                // REGRA 3: Buffer acima de threshold degraded
+                // REGRA 3: Buffer acima de threshold degradado
                 if (fillPercentage >= DegradedBufferThreshold)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Buffer",
-                        severity: LoggingHealthStatus.Degraded,
-                        description: $"Buffer usage high ({state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
+                        "Buffer",
+                        LoggingHealthStatus.Degraded,
+                        $"Buffer usage high ({state.CurrentBufferSize}/{state.MaxBufferCapacity}, {fillPercentage:P1})"
                     ));
                     return LoggingHealthStatus.Degraded;
                 }
@@ -172,50 +168,60 @@ namespace CustomLogger.HealthChecks
             {
                 // Proteção: avaliação do buffer falhou
                 issues.Add(new HealthIssue(
-                    component: "Buffer",
-                    severity: LoggingHealthStatus.Unknown,
-                    description: $"Buffer evaluation failed: {ex.Message}"
+                    "Buffer",
+                    LoggingHealthStatus.Unknown,
+                    $"Buffer evaluation failed: {ex.Message}"
                 ));
                 return LoggingHealthStatus.Unknown;
             }
         }
 
+        #endregion
+
+        #region Sinks Check
+
         /// <summary>
-        /// Avalia estado de todos os sinks.
+        /// CHECK 2: Avalia estado de todos os sinks.
         /// 
         /// REGRAS:
         /// - Sink não-operacional → Unhealthy
         /// - Sink sem escrita há &gt; 5min → Unhealthy
-        /// - Sink reportando fallback → Degraded
+        /// - Sink em fallback/degraded → Degraded
         /// - Todos sinks saudáveis → Healthy
         /// 
         /// AGREGAÇÃO:
         /// Pior status entre todos os sinks vence.
+        /// 
+        /// EDGE CASE:
+        /// - Nenhum sink configurado → Degraded (configuração inválida)
         /// </summary>
-        private LoggingHealthStatus EvaluateSinks(ILoggingHealthState state, List<HealthIssue> issues)
+        private LoggingHealthStatus EvaluateSinks(
+            ILoggingHealthState state,
+            List<HealthIssue> issues,
+            Dictionary<string, LoggingHealthStatus> sinkStatuses)
         {
             try
             {
                 var sinkStates = state.SinkStates;
 
-                // Proteção: lista de sinks null
+                // Validação: lista de sinks null
                 if (sinkStates == null)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Sinks",
-                        severity: LoggingHealthStatus.Unknown,
-                        description: "SinkStates is null"
+                        "Sinks",
+                        LoggingHealthStatus.Unknown,
+                        "SinkStates is null"
                     ));
                     return LoggingHealthStatus.Unknown;
                 }
 
-                // Caso edge: nenhum sink configurado
+                // Edge case: nenhum sink configurado
                 if (sinkStates.Count == 0)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Sinks",
-                        severity: LoggingHealthStatus.Degraded,
-                        description: "No sinks configured"
+                        "Sinks",
+                        LoggingHealthStatus.Degraded,
+                        "No sinks configured"
                     ));
                     return LoggingHealthStatus.Degraded;
                 }
@@ -223,11 +229,13 @@ namespace CustomLogger.HealthChecks
                 var worstSinkStatus = LoggingHealthStatus.Healthy;
                 var now = DateTime.UtcNow;
 
+                // Avaliar cada sink individualmente
                 foreach (var sink in sinkStates)
                 {
                     var sinkStatus = EvaluateSingleSink(sink, now, issues);
+                    sinkStatuses[sink.Name] = sinkStatus;
 
-                    // Agregar: pior status vence
+                    // Agregar: pior vence
                     if (sinkStatus > worstSinkStatus)
                     {
                         worstSinkStatus = sinkStatus;
@@ -240,9 +248,9 @@ namespace CustomLogger.HealthChecks
             {
                 // Proteção: avaliação de sinks falhou
                 issues.Add(new HealthIssue(
-                    component: "Sinks",
-                    severity: LoggingHealthStatus.Unknown,
-                    description: $"Sinks evaluation failed: {ex.Message}"
+                    "Sinks",
+                    LoggingHealthStatus.Unknown,
+                    $"Sinks evaluation failed: {ex.Message}"
                 ));
                 return LoggingHealthStatus.Unknown;
             }
@@ -250,6 +258,12 @@ namespace CustomLogger.HealthChecks
 
         /// <summary>
         /// Avalia um único sink.
+        /// 
+        /// REGRAS:
+        /// 1. IsOperational = false → Unhealthy
+        /// 2. LastSuccessfulWrite &gt; 5min atrás → Unhealthy
+        /// 3. StatusMessage contém "fallback" ou "degraded" → Degraded
+        /// 4. Caso contrário → Healthy
         /// </summary>
         private LoggingHealthStatus EvaluateSingleSink(
             SinkHealthSnapshot sink,
@@ -262,9 +276,9 @@ namespace CustomLogger.HealthChecks
             if (!sink.IsOperational)
             {
                 issues.Add(new HealthIssue(
-                    component: componentName,
-                    severity: LoggingHealthStatus.Unhealthy,
-                    description: $"{sink.Type} is not operational: {sink.StatusMessage ?? "Unknown reason"}"
+                    componentName,
+                    LoggingHealthStatus.Unhealthy,
+                    $"{sink.Type} is not operational: {sink.StatusMessage ?? "Unknown reason"}"
                 ));
                 return LoggingHealthStatus.Unhealthy;
             }
@@ -277,15 +291,15 @@ namespace CustomLogger.HealthChecks
                 if (timeSinceLastSuccess > SinkFailureWindow)
                 {
                     issues.Add(new HealthIssue(
-                        component: componentName,
-                        severity: LoggingHealthStatus.Unhealthy,
-                        description: $"{sink.Type} has not written successfully in {timeSinceLastSuccess.TotalMinutes:F1} minutes"
+                        componentName,
+                        LoggingHealthStatus.Unhealthy,
+                        $"{sink.Type} has not written successfully in {timeSinceLastSuccess.TotalMinutes:F1} minutes"
                     ));
                     return LoggingHealthStatus.Unhealthy;
                 }
             }
 
-            // REGRA 3: Sink em modo fallback (inferido por StatusMessage)
+            // REGRA 3: Sink em modo fallback ou degradado (inferido por StatusMessage)
             if (!string.IsNullOrEmpty(sink.StatusMessage))
             {
                 var message = sink.StatusMessage.ToLowerInvariant();
@@ -293,9 +307,9 @@ namespace CustomLogger.HealthChecks
                 if (message.Contains("fallback") || message.Contains("degraded"))
                 {
                     issues.Add(new HealthIssue(
-                        component: componentName,
-                        severity: LoggingHealthStatus.Degraded,
-                        description: $"{sink.Type} status: {sink.StatusMessage}"
+                        componentName,
+                        LoggingHealthStatus.Degraded,
+                        $"{sink.Type} status: {sink.StatusMessage}"
                     ));
                     return LoggingHealthStatus.Degraded;
                 }
@@ -305,12 +319,20 @@ namespace CustomLogger.HealthChecks
             return LoggingHealthStatus.Healthy;
         }
 
+        #endregion
+
+        #region Degraded Mode Check
+
         /// <summary>
-        /// Avalia se modo degradado está ativo.
+        /// CHECK 3: Avalia se modo degradado está ativo.
         /// 
         /// REGRA:
-        /// - Modo degradado ativo → Degraded (nunca Healthy)
+        /// - Modo degradado ativo → Degraded (NUNCA Healthy)
         /// - Modo degradado inativo → Healthy
+        /// 
+        /// IMPORTANTE:
+        /// Quando modo degradado está ativo, o status global NUNCA pode ser Healthy,
+        /// mesmo que buffer e sinks estejam bem.
         /// </summary>
         private LoggingHealthStatus EvaluateDegradedMode(ILoggingHealthState state, List<HealthIssue> issues)
         {
@@ -319,9 +341,9 @@ namespace CustomLogger.HealthChecks
                 if (state.IsDegradedMode)
                 {
                     issues.Add(new HealthIssue(
-                        component: "Provider",
-                        severity: LoggingHealthStatus.Degraded,
-                        description: "Logger is operating in degraded mode"
+                        "Provider",
+                        LoggingHealthStatus.Degraded,
+                        "Logger is operating in degraded mode"
                     ));
                     return LoggingHealthStatus.Degraded;
                 }
@@ -332,13 +354,17 @@ namespace CustomLogger.HealthChecks
             {
                 // Proteção: avaliação de modo degradado falhou
                 issues.Add(new HealthIssue(
-                    component: "Provider",
-                    severity: LoggingHealthStatus.Unknown,
-                    description: $"Degraded mode evaluation failed: {ex.Message}"
+                    "Provider",
+                    LoggingHealthStatus.Unknown,
+                    $"Degraded mode evaluation failed: {ex.Message}"
                 ));
                 return LoggingHealthStatus.Unknown;
             }
         }
+
+        #endregion
+
+        #region Aggregation
 
         /// <summary>
         /// Agrega múltiplos status em um único resultado.
@@ -348,23 +374,60 @@ namespace CustomLogger.HealthChecks
         /// 2. Senão, se qualquer = Degraded → Degraded
         /// 3. Senão, se qualquer = Unknown → Unknown
         /// 4. Senão → Healthy
+        /// 
+        /// IMPORTANTE:
+        /// Esta ordem NÃO deve ser alterada.
         /// </summary>
         private LoggingHealthStatus AggregateStatuses(params LoggingHealthStatus[] statuses)
         {
-            // Usar Max() para pegar o maior valor (pior status)
-            // Ordem: Unknown(0) < Healthy(1) < Degraded(2) < Unhealthy(3)
+            // Prioridade 1: Unhealthy
+            if (statuses.Any(s => s == LoggingHealthStatus.Unhealthy))
+                return LoggingHealthStatus.Unhealthy;
 
-            // Porém Unknown é especial: deve ter prioridade apenas se não houver pior
-            var hasUnhealthy = statuses.Any(s => s == LoggingHealthStatus.Unhealthy);
-            if (hasUnhealthy) return LoggingHealthStatus.Unhealthy;
+            // Prioridade 2: Degraded
+            if (statuses.Any(s => s == LoggingHealthStatus.Degraded))
+                return LoggingHealthStatus.Degraded;
 
-            var hasDegraded = statuses.Any(s => s == LoggingHealthStatus.Degraded);
-            if (hasDegraded) return LoggingHealthStatus.Degraded;
+            // Prioridade 3: Unknown
+            if (statuses.Any(s => s == LoggingHealthStatus.Unknown))
+                return LoggingHealthStatus.Unknown;
 
-            var hasUnknown = statuses.Any(s => s == LoggingHealthStatus.Unknown);
-            if (hasUnknown) return LoggingHealthStatus.Unknown;
-
+            // Default: Healthy
             return LoggingHealthStatus.Healthy;
         }
+
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Calcula percentual de uso do buffer (0.0 a 100.0).
+        /// 
+        /// RETORNO:
+        /// - 0.0 a 100.0: Percentual válido
+        /// - -1.0: Informação indisponível (erro de cálculo)
+        /// 
+        /// PROTEÇÃO:
+        /// Não lança exceção, retorna -1.0 em caso de erro.
+        /// </summary>
+        private double CalculateBufferUsagePercentage(ILoggingHealthState state)
+        {
+            try
+            {
+                if (state.MaxBufferCapacity <= 0)
+                    return -1.0;
+
+                if (state.CurrentBufferSize < 0)
+                    return -1.0;
+
+                return ((double)state.CurrentBufferSize / state.MaxBufferCapacity) * 100.0;
+            }
+            catch
+            {
+                return -1.0;
+            }
+        }
+
+        #endregion
     }
 }

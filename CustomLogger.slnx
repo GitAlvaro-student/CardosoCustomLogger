@@ -14,6 +14,7 @@
     <File Path="CustomLogger/Análise Arquitetural.md" />
     <File Path="CustomLogger/planejamento_arquitetural_evolucao_do_custom_logger - Copy.md" />
   </Folder>
+  <Project Path="CustomLogger.AspNetCore.HealthChecks/CustomLogger.AspNetCore.HealthChecks.csproj" Id="344ae80d-5997-4e2e-bc5e-d784a9654aa8" />
   <Project Path="CustomLogger.HealthChecks/CustomLogger.HealthChecks.csproj" Id="b82ed402-e5d4-490f-ac02-71c8eddf9134" />
   <Project Path="CustomLogger.OpenTelemetry.AspNet/CustomLogger.OpenTelemetry.AspNet.csproj" Id="b85a1fe5-1a78-4a33-a1e8-117becd02311" />
   <Project Path="CustomLogger.OpenTelemetry/CustomLogger.OpenTelemetry.csproj" Id="7aacae0c-c39b-4b54-be6e-6d58a52f064a" />
