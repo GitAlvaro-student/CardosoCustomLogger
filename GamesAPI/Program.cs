@@ -1,6 +1,10 @@
-using GamesAPI.Services;
-using CustomLogger.Providers;
+using CustomLogger.Abstractions;
+using CustomLogger.AspNetCore.HealthChecks;
+using CustomLogger.HealthChecks;
+using CustomLogger.HealthChecks.Abstractions;
 using CustomLogger.OpenTelemetry;
+using CustomLogger.Providers;
+using GamesAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +13,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddCustomLogging(builder.Configuration);
 builder.Services.AddCustomLoggerOpenTelemetry(builder.Configuration);
+
+builder.Services.AddSingleton<ILoggingHealthEvaluator, DefaultLoggingHealthEvaluator>();
+
+builder.Services.AddSingleton<ILoggingHealthState>(sp =>
+{
+    // Assumir que AddCustomLogging já registrou o provider
+    return sp.GetService<CustomLoggerProvider>() as ILoggingHealthState
+        ?? throw new InvalidOperationException("CustomLoggerProvider must implement ILoggingHealthState");
+});
+
+builder.Services.AddHealthChecks()
+    .AddCustomLogger();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -31,5 +47,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHealthChecks("/health");
 
 app.Run();

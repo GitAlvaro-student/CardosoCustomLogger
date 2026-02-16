@@ -1,6 +1,8 @@
-﻿using CustomLogger.Adapters;
+﻿using CustomLogger.Abstractions;
+using CustomLogger.Adapters;
 using CustomLogger.Configurations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -40,6 +42,9 @@ namespace CustomLogger.Providers
 
             // 4. Registra o Provider
             builder.AddProvider(provider);
+
+            builder.Services.AddSingleton(provider);
+            builder.Services.AddSingleton<ILoggingHealthState>(provider);
 
             return builder;
         }
