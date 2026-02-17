@@ -310,10 +310,12 @@
     <Compile Include="Areas\HelpPage\SampleGeneration\SampleDirection.cs" />
     <Compile Include="Areas\HelpPage\SampleGeneration\TextSample.cs" />
     <Compile Include="Areas\HelpPage\XmlDocumentationProvider.cs" />
+    <Compile Include="Controllers\HealthController.cs" />
     <Compile Include="Controllers\PaymentController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="HealthCheckHandler.cs" />
     <Compile Include="Logging\PagamentoEventIds.cs" />
     <Compile Include="Models\Payment.cs" />
     <Compile Include="Models\PaymentRequest.cs" />
@@ -357,6 +359,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\CustomLogger.HealthChecks\CustomLogger.HealthChecks.csproj">
+      <Project>{b82ed402-e5d4-490f-ac02-71c8eddf9134}</Project>
+      <Name>CustomLogger.HealthChecks</Name>
+    </ProjectReference>
     <ProjectReference Include="..\CustomLogger.OpenTelemetry.AspNet\CustomLogger.OpenTelemetry.AspNet.csproj">
       <Project>{b85a1fe5-1a78-4a33-a1e8-117becd02311}</Project>
       <Name>CustomLogger.OpenTelemetry.AspNet</Name>

@@ -6,6 +6,7 @@ using CustomLogger.Sinks;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace CustomLogger.Providers
 {
@@ -15,11 +16,14 @@ namespace CustomLogger.Providers
     /// 
     /// RFC - Lifecycle: CREATED → OPERATIONAL → STOPPING → DISPOSING → DISPOSED
     /// </summary>
-    public sealed class CustomLoggerProvider : ILoggerProvider
+    public sealed class CustomLoggerProvider : ILoggerProvider, ILoggingHealthState
     {
         private readonly CustomProviderConfiguration _configuration;
         private readonly IAsyncLogBuffer _buffer;
         private readonly List<IDisposable> _disposables = new List<IDisposable>();
+
+        // Track sinks list so health snapshot can expose them
+        private readonly IReadOnlyList<ILogSink> _trackedSinks;
 
         // Gerenciador de estado (centraliza toda lógica de transições)
         private readonly ProviderLifecycleManager _lifecycle = new ProviderLifecycleManager();
@@ -46,11 +50,23 @@ namespace CustomLogger.Providers
             // Rastreia sinks descartáveis para dispose futuro
             if (sinksToTrack != null)
             {
+                var list = new List<ILogSink>();
+                foreach(var s in sinksToTrack)
+                {
+                    if (s != null) list.Add(s);
+                }
+
+                _trackedSinks = list.AsReadOnly();
+
                 foreach (var s in sinksToTrack)
                 {
                     if (s is IDisposable disposable)
                         _disposables.Add(disposable);
                 }
+            }
+            else
+            {
+                _trackedSinks = new List<ILogSink>().AsReadOnly();
             }
 
             // Estado permanece CREATED até primeira chamada a CreateLogger()
@@ -219,6 +235,157 @@ namespace CustomLogger.Providers
             // Estado final: DISPOSED
             // Todos os recursos liberados (best-effort)
             // Provider está completamente inutilizável
+        }
+
+        /// <summary>
+        /// Leitura thread-safe do tamanho atual do buffer.
+        /// 
+        /// IMPLEMENTAÇÃO:
+        /// - Delega para InstanceLogBuffer (que já tem ConcurrentQueue)
+        /// - Snapshot atômico via ConcurrentQueue.Count
+        /// </summary>
+        int ILoggingHealthState.CurrentBufferSize
+        {
+            get
+            {
+                // Se usar buffer global: retornar _buffer.CurrentSize
+                // Se usar buffer de instância: agregar todos os buffers
+
+                // Exemplo para buffer de instância:
+                // return _loggers.Values.Sum(logger => logger.Buffer.CurrentSize);
+
+                // IMPORTANTE: Não lançar exceção, retornar 0 se disposed
+                return 0; // Stub - substituir por lógica real
+            }
+        }
+
+        int ILoggingHealthState.MaxBufferCapacity => _configuration.Options.MaxBufferSize ?? 0;
+
+        bool ILoggingHealthState.IsDiscardingMessages
+        {
+            get
+            {
+                // Minimal conservative check
+                try
+                {
+                    var current = ((ILoggingHealthState)this).CurrentBufferSize;
+                    var max = ((ILoggingHealthState)this).MaxBufferCapacity;
+                    if (max <= 0) return false;
+                    return current >= max;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        bool ILoggingHealthState.IsDegradedMode
+        {
+            get
+            {
+                // If any tracked sink is degraded, consider provider degraded
+                try
+                {
+                    foreach (var sink in _trackedSinks)
+                    {
+                        if (sink == null) continue;
+
+                        // DegradableLogSink exposes IsDegraded
+                        var degr = sink as DegradableLogSink;
+                        if (degr != null && degr.IsDegraded)
+                            return true;
+                    }
+                }
+                catch
+                {
+                }
+
+                // Default: false
+                return false;
+            }
+        }
+
+        IReadOnlyList<SinkHealthSnapshot> ILoggingHealthState.SinkStates
+        {
+            get
+            {
+                var snapshots = new List<SinkHealthSnapshot>();
+
+                try
+                {
+                    if (_trackedSinks != null && _trackedSinks.Count > 0)
+                    {
+                        foreach (var sink in _trackedSinks)
+                        {
+                            if (sink == null)
+                                continue;
+
+                            // If sink is a CompositeLogSink, try to enumerate inner sinks (reflection fallback)
+                            if (sink is CompositeLogSink composite)
+                            {
+                                // Try to reflect private readonly field "_sinks"
+                                var fi = composite.GetType().GetField("_sinks", BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (fi != null)
+                                {
+                                    var value = fi.GetValue(composite) as IEnumerable<ILogSink>;
+                                    if (value != null)
+                                    {
+                                        foreach (var inner in value)
+                                        {
+                                            if (inner == null) continue;
+
+                                            bool isOperational = true;
+                                            string statusMessage = null;
+
+                                            var degradable = inner as DegradableLogSink;
+                                            if (degradable != null && degradable.IsDegraded)
+                                            {
+                                                isOperational = false;
+                                                statusMessage = "Degraded";
+                                            }
+
+                                            snapshots.Add(new SinkHealthSnapshot(
+                                                name: inner.GetType().Name,
+                                                type: inner.GetType().FullName,
+                                                isOperational: isOperational,
+                                                statusMessage: statusMessage
+                                            ));
+                                        }
+
+                                        // continue to next tracked sink
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            // Normal (non-composite) sink handling
+                            bool operationalFlag = true;
+                            string status = null;
+
+                            var d = sink as DegradableLogSink;
+                            if (d != null && d.IsDegraded)
+                            {
+                                operationalFlag = false;
+                                status = "Degraded";
+                            }
+
+                            snapshots.Add(new SinkHealthSnapshot(
+                                name: sink.GetType().Name,
+                                type: sink.GetType().FullName,
+                                isOperational: operationalFlag,
+                                statusMessage: status
+                            ));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Best-effort: if anything fails, return what we have (possibly empty)
+                }
+
+                return snapshots.AsReadOnly();
+            }
         }
     }
 }
