@@ -7,7 +7,7 @@ using System.Text;
 
 namespace CustomLogger.Adapters
 {
-    internal sealed class NetFrameworkConfigurationAdapter
+    public sealed class NetFrameworkConfigurationAdapter
     {
         public LoggingOptions CreateFromAppSettings()
         {

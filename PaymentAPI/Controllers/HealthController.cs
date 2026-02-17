@@ -1,6 +1,7 @@
 ﻿using CustomLogger.HealthChecks;
 using CustomLogger.HealthChecks.Models;
 using System.Web.Http;
+using static PaymentAPI.WebApiApplication;
 
 namespace PaymentAPI.Controllers
 {
@@ -60,7 +61,7 @@ namespace PaymentAPI.Controllers
         private static LoggingHealthMonitor CreateMonitor()
         {
             // Obter provider do logger (assumindo registro global)
-            var provider = GlobalLoggerProvider.Instance; // Exemplo
+            var provider = Global.LoggerProvider;
             var evaluator = new DefaultLoggingHealthEvaluator();
 
             return new LoggingHealthMonitor(

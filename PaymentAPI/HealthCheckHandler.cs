@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using static PaymentAPI.WebApiApplication;
 
 namespace PaymentAPI
 {
@@ -16,7 +17,7 @@ namespace PaymentAPI
     /// <system.webServer>
     ///   <handlers>
     ///     <add name="HealthCheck" path="health" verb="GET" 
-    ///          type="MyApp.HealthCheckHandler, MyApp" />
+    ///          type="PaymentAPI.HealthCheckHandler, PaymentAPI" />
     ///   </handlers>
     /// </system.webServer>
     /// </summary>
@@ -70,7 +71,7 @@ namespace PaymentAPI
 
         private static LoggingHealthMonitor CreateMonitor()
         {
-            var provider = GlobalLoggerProvider.Instance;
+            var provider = Global.LoggerProvider;
             var evaluator = new DefaultLoggingHealthEvaluator();
 
             return new LoggingHealthMonitor(
