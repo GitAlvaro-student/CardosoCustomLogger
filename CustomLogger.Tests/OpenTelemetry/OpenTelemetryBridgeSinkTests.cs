@@ -23,8 +23,10 @@ namespace CustomLogger.Tests.OpenTelemetry
             // CORREÇÃO: Cria listener para que StartActivity não retorne null
             _listener = new ActivityListener
             {
-                ShouldListenTo = source => source.Name == "MyLogger",
-                Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData
+                ShouldListenTo = _ => true, // Escuta todas as sources
+                Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
+                ActivityStarted = activity => { },
+                ActivityStopped = activity => { }
             };
             ActivitySource.AddActivityListener(_listener);
         }
