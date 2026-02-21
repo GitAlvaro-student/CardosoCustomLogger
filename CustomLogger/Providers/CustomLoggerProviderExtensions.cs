@@ -40,7 +40,21 @@ namespace CustomLogger.Providers
                 .WithLoggingOptions(loggingOptions)
                 .BuildApplication();
 
-            // 4. Registra o Provider
+            // 4.1 Registrar filtro para o provider
+            var minimumLevel = loggingOptions.MinimumLogLevel ?? LogLevel.Information;
+
+            var environment = loggingOptions.Environment ?? "";
+            if (environment.Equals("Production", StringComparison.OrdinalIgnoreCase))
+            {
+                if (minimumLevel < LogLevel.Information)
+                {
+                    minimumLevel = LogLevel.Information;
+                }
+            }
+
+            builder.AddFilter<CustomLoggerProvider>((category, level) => level >= minimumLevel);
+
+            // 4.2 Registra o Provider
             builder.AddProvider(provider);
 
             builder.Services.AddSingleton(provider);

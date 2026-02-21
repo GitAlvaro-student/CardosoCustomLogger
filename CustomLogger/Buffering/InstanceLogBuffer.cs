@@ -34,10 +34,11 @@ namespace CustomLogger.Buffering
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
             // RFC: Timer para flush periódico (se configurado)
+            // ✅ CORRIGIDO: Timer usa FlushAsync para evitar bloqueio de threads do pool
             if (_options.BatchOptions.FlushIntervalMs > 0)
             {
                 _flushTimer = new Timer(
-                    _ => Flush(),
+                    async _ => await FlushAsync(CancellationToken.None),
                     null,
                     (int)_options.BatchOptions.FlushIntervalMs,
                     (int)_options.BatchOptions.FlushIntervalMs
@@ -275,6 +276,51 @@ namespace CustomLogger.Buffering
         }
 
         /// <summary>
+        /// Processa batch de logs de forma assíncrona.
+        /// 
+        /// ✅ NOVO: Versão async para background processing (Timer, FlushAsync explícito).
+        /// RFC: Tenta WriteBatchAsync primeiro (se sink suportar).
+        /// RFC: Fallback para WriteAsync individual.
+        /// RFC: Fallback final para versão síncrona (se sink não suportar async).
+        /// RFC: TODAS as exceções são capturadas e absorvidas.
+        /// </summary>
+        private async Task ProcessBatchAsync(List<ILogEntry> batch, CancellationToken cancellationToken)
+        {
+            Debug.WriteLine("[ProcessBatchAsync] >>> Iniciando ProcessBatchAsync");
+
+            // ====================================================================
+            // ESTRATÉGIA 1: Tentar WriteBatchAsync (se sink suportar async batch)
+            // ====================================================================
+            if (_sink is IAsyncBatchLogSink asyncBatchSink)
+            {
+                try
+                {
+                    await asyncBatchSink.WriteBatchAsync(batch, cancellationToken);
+                    return; // Sucesso - batch processado completamente
+                }
+                catch
+                {
+                    // Fallback para processamento individual async
+                }
+            }
+
+            // ====================================================================
+            // ESTRATÉGIA 2: Tentar WriteAsync individual (se sink suportar async)
+            // ====================================================================
+            if (_sink is IAsyncLogSink asyncSink)
+            {
+                await ProcessIndividualLogsAsync(batch, asyncSink, cancellationToken);
+                return;
+            }
+
+            // ====================================================================
+            // ESTRATÉGIA 3: Fallback para versão síncrona
+            // ====================================================================
+            // RFC: Se sink não implementa async, usa versão sync
+            ProcessBatch(batch);
+        }
+
+        /// <summary>
         /// Processa logs individualmente, um por vez.
         /// 
         /// RFC: Escrita individual é tentada UMA vez por log.
@@ -340,6 +386,35 @@ namespace CustomLogger.Buffering
         }
 
         /// <summary>
+        /// Processa logs individualmente de forma assíncrona.
+        /// 
+        /// ✅ NOVO: Versão async para background processing.
+        /// RFC: Escrita individual é tentada UMA vez por log.
+        /// RFC: Falha em um log NÃO impede processamento dos demais.
+        /// RFC: TODAS as exceções são capturadas e absorvidas.
+        /// </summary>
+        private async Task ProcessIndividualLogsAsync(
+            List<ILogEntry> batch,
+            IAsyncLogSink asyncSink,
+            CancellationToken cancellationToken)
+        {
+            Debug.WriteLine("[ProcessIndividualLogsAsync] >>> Iniciando ProcessIndividualLogsAsync");
+
+            foreach (var entry in batch)
+            {
+                try
+                {
+                    await asyncSink.WriteAsync(entry, cancellationToken);
+                }
+                catch
+                {
+                    // RFC: Absorve TODAS as exceções
+                    // Log é descartado se falhar
+                }
+            }
+        }
+
+        /// <summary>
         /// Flush assíncrono.
         /// 
         /// RFC: Dispose() síncrono NÃO aguarda FlushAsync().
@@ -361,38 +436,34 @@ namespace CustomLogger.Buffering
             }
 
             // ====================================================================
-            // FLUSH ASSÍNCRONO
+            // DRENAGEM DA FILA (sync - rápido)
             // ====================================================================
-            // RFC: FlushAsync pode ser abandonado durante Dispose()
-            // RFC: Dispose() é síncrono e NÃO aguarda FlushAsync em andamento
-            // 
-            // Task.Run permite cancelamento via CancellationToken
-            // Se cancelado, OperationCanceledException é absorvida no caller
+            // RFC: Lock apenas para drenagem da fila
+            // RFC: I/O (lento) será feito fora do lock
+            List<ILogEntry> batch;
 
-            await Task.Run(() =>
+            lock (_flushLock)
             {
-                // ================================================================
-                // FLUSH: Processar fila (idêntico a Flush síncrono)
-                // ================================================================
-                lock (_flushLock)
+                if (_queue.IsEmpty)
+                    return;
+
+                // Drena fila completa
+                batch = new List<ILogEntry>();
+                while (_queue.TryDequeue(out var entry))
                 {
-                    if (_queue.IsEmpty)
-                        return;
-
-                    // Drena fila completa
-                    var batch = new List<ILogEntry>();
-                    while (_queue.TryDequeue(out var entry))
-                    {
-                        batch.Add(entry);
-                    }
-
-                    if (batch.Count == 0)
-                        return;
-
-                    // Processa batch (mesma lógica que Flush síncrono)
-                    ProcessBatch(batch);
+                    batch.Add(entry);
                 }
-            }, cancellationToken);
+            }
+
+            if (batch.Count == 0)
+                return;
+
+            // ====================================================================
+            // PROCESSAMENTO ASYNC (fora do lock)
+            // ====================================================================
+            // ✅ CORRIGIDO: I/O async nativo sem Task.Run
+            // ✅ CORRIGIDO: CancellationToken propagado corretamente
+            await ProcessBatchAsync(batch, cancellationToken);
         }
 
         /// <summary>

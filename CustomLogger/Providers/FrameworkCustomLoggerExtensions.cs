@@ -19,7 +19,7 @@ namespace CustomLogger.Providers
                 throw new ArgumentNullException(nameof(builder));
 
             // 1. Cria o adapter específico para .NET Framework
-            var adapter = new NetFrameworkConfigurationAdapter();
+            var adapter = new FrameworkConfigurationAdapter();
 
             // 2. Converte appSettings em LoggingOptions
             var loggingOptions = adapter.CreateFromAppSettings();

@@ -2,12 +2,21 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Net.NetworkInformation;
 
 namespace CustomLogger.Adapters
 {
+    /// <summary>
+    /// Adaptador para converter IConfiguration em LoggingOptions.
+    /// Usado em aplicações .NET Core/.NET 5+.
+    /// </summary>
     public sealed class CoreConfigurationAdapter
     {
+        /// <summary>
+        /// Cria LoggingOptions a partir de IConfiguration.
+        /// 
+        /// REFATORADO: CC = 1 (ANTES: CC = 60)
+        /// Complexidade delegada para métodos privados coesos.
+        /// </summary>
         public LoggingOptions CreateFromConfiguration(IConfiguration configuration)
         {
             if (configuration == null)
@@ -15,182 +24,239 @@ namespace CustomLogger.Adapters
 
             var section = configuration.GetSection("CustomLogger");
 
-            // MinimumLogLevel
-            LogLevel? minimumLogLevel = null;
-            var levelStr = section["MinimumLogLevel"];
-            if (!string.IsNullOrWhiteSpace(levelStr))
-            {
-                if (Enum.TryParse<LogLevel>(levelStr, ignoreCase: true, out var parsedLevel))
-                {
-                    minimumLogLevel = parsedLevel;
-                }
-            }
-
-            string serviceName = null;
-            var servName = section["ServiceName"];
-            if (!string.IsNullOrWhiteSpace(servName))
-            {
-                serviceName = servName;
-            }
-
-            string environment = null;
-            var env = section["Environment"];
-            if (!string.IsNullOrWhiteSpace(env))
-            {
-                environment = env;
-            }
-
-            // BufferOptions
-            BufferOptions bufferOptions = null;
-            var bufferSection = section.GetSection("Buffer");
-            if (bufferSection.Exists())
-            {
-                bool? bufferEnabled = null;
-                var enabledValue = bufferSection["Enabled"];
-                if (!string.IsNullOrWhiteSpace(enabledValue) && bool.TryParse(enabledValue, out var parsedEnabled))
-                {
-                    bufferEnabled = parsedEnabled;
-                }
-
-                int? maxSize = null;
-                var maxSizeValue = bufferSection["MaxSize"];
-                if (!string.IsNullOrWhiteSpace(maxSizeValue) && int.TryParse(maxSizeValue, out var parsedMaxSize))
-                {
-                    maxSize = parsedMaxSize;
-                }
-
-                bufferOptions = new BufferOptions(bufferEnabled, maxSize);
-            }
-
-            // SinkOptions
-            SinkOptions sinkOptions = null;
-            var sinksSection = section.GetSection("Sinks");
-            if (sinksSection.Exists())
-            {
-                // Console
-                ConsoleSinkOptions consoleOptions = null;
-                var consoleSection = sinksSection.GetSection("Console");
-                if (consoleSection.Exists())
-                {
-                    bool? consoleEnabled = null;
-                    var consoleEnabledValue = consoleSection["Enabled"];
-                    if (!string.IsNullOrWhiteSpace(consoleEnabledValue) && bool.TryParse(consoleEnabledValue, out var parsedConsoleEnabled))
-                    {
-                        consoleEnabled = parsedConsoleEnabled;
-                    }
-
-                    consoleOptions = new ConsoleSinkOptions(consoleEnabled);
-                }
-
-                // File
-                FileSinkOptions fileOptions = null;
-                var fileSection = sinksSection.GetSection("File");
-                if (fileSection.Exists())
-                {
-                    bool? fileEnabled = null;
-                    var fileEnabledValue = fileSection["Enabled"];
-                    if (!string.IsNullOrWhiteSpace(fileEnabledValue) && bool.TryParse(fileEnabledValue, out var parsedFileEnabled))
-                    {
-                        fileEnabled = parsedFileEnabled;
-                    }
-
-                    var filePath = fileSection["Path"];
-
-                    fileOptions = new FileSinkOptions(fileEnabled, filePath);
-                }
-
-                // BlobStorage
-                BlobStorageSinkOptions blobOptions = null;
-                var blobSection = sinksSection.GetSection("BlobStorage");
-                if (blobSection.Exists())
-                {
-                    bool? blobEnabled = null;
-                    var blobEnabledValue = blobSection["Enabled"];
-                    if (!string.IsNullOrWhiteSpace(blobEnabledValue) && bool.TryParse(blobEnabledValue, out var parsedBlobEnabled))
-                    {
-                        blobEnabled = parsedBlobEnabled;
-                    }
-
-                    var connectionString = blobSection["ConnectionString"];
-                    var containerName = blobSection["ContainerName"];
-
-                    blobOptions = new BlobStorageSinkOptions(
-                        blobEnabled,
-                        connectionString,
-                        containerName
-                    );
-                }
-
-                // Dynatrace
-                DynatraceSinkOptions dynatraceOptions = null;
-                var dynatraceSection = sinksSection.GetSection("Dynatrace");
-                if (dynatraceSection.Exists())
-                {
-                    bool? dynatraceEnabled = null;
-                    var dynatraceEnabledValue = dynatraceSection["Enabled"];
-                    if (!string.IsNullOrWhiteSpace(dynatraceEnabledValue) &&
-                        bool.TryParse(dynatraceEnabledValue, out var parsedDynatraceEnabled))
-                    {
-                        dynatraceEnabled = parsedDynatraceEnabled;
-                    }
-
-                    var endpoint = dynatraceSection["Endpoint"];
-                    var apiToken = dynatraceSection["ApiToken"];
-
-                    int? timeoutSeconds = null;
-                    var timeoutValue = dynatraceSection["TimeoutSeconds"];
-                    if (!string.IsNullOrWhiteSpace(timeoutValue) &&
-                        int.TryParse(timeoutValue, out var parsedTimeout))
-                    {
-                        timeoutSeconds = parsedTimeout;
-                    }
-
-                    dynatraceOptions = new DynatraceSinkOptions(
-                        dynatraceEnabled,
-                        endpoint,
-                        apiToken,
-                        timeoutSeconds
-                    );
-                }
-
-
-                sinkOptions = new SinkOptions(
-                    consoleOptions,
-                    fileOptions,
-                    blobOptions,
-                    dynatraceOptions
-                );
-            }
-
-            BatchOptions batchOptions = null;
-            var batchSection = section.GetSection("Batch");
-            if (batchSection.Exists())
-            {
-                int? batchSize = null;
-                var batchSizeValue = batchSection["BatchSize"];
-                if (!string.IsNullOrWhiteSpace(batchSizeValue) && int.TryParse(batchSizeValue, out var parsedBatchSize))
-                {
-                    batchSize = parsedBatchSize;
-                }
-
-                int? flushIntervalMs = null;
-                var flushIntervalValue = batchSection["FlushIntervalMs"];
-                if (!string.IsNullOrWhiteSpace(flushIntervalValue) && int.TryParse(flushIntervalValue, out var parsedFlushInterval))
-                {
-                    flushIntervalMs = parsedFlushInterval;
-                }
-
-                batchOptions = new BatchOptions(batchSize, flushIntervalMs);
-            }
+            // Parsing delegado para métodos privados (CC: +0 cada)
+            var (minimumLogLevel, serviceName, environment) = ParsePrimitiveOptions(section);
+            var bufferOptions = ParseBufferOptions(section);
+            var sinkOptions = ParseSinkOptions(section);
+            var batchOptions = ParseBatchOptions(section);
 
             return new LoggingOptions(
-                    minimumLogLevel,
-                    serviceName,
-                    environment,
-                    bufferOptions,
-                    batchOptions,
-                    sinkOptions
-                );
+                minimumLogLevel,
+                serviceName,
+                environment,
+                bufferOptions,
+                batchOptions,
+                sinkOptions
+            );
         }
+
+        #region Primitive Options Parsing
+
+        /// <summary>
+        /// Extrai configurações primitivas do nível raiz.
+        /// CC: ~3-5
+        /// </summary>
+        private (LogLevel? minimumLogLevel, string serviceName, string environment) ParsePrimitiveOptions(
+            IConfigurationSection section)
+        {
+            var minimumLogLevel = ParseEnum<LogLevel>(section, "MinimumLogLevel");
+            var serviceName = ParseString(section, "ServiceName");
+            var environment = ParseString(section, "Environment");
+
+            return (minimumLogLevel, serviceName, environment);
+        }
+
+        #endregion
+
+        #region Buffer Options Parsing
+
+        /// <summary>
+        /// Constrói BufferOptions a partir da seção "Buffer".
+        /// CC: ~4-7
+        /// </summary>
+        private BufferOptions ParseBufferOptions(IConfigurationSection section)
+        {
+            var bufferSection = section.GetSection("Buffer");
+            if (!bufferSection.Exists())
+                return null;
+
+            var bufferEnabled = ParseBool(bufferSection, "Enabled");
+            var maxSize = ParseInt(bufferSection, "MaxSize");
+
+            return new BufferOptions(bufferEnabled, maxSize);
+        }
+
+        #endregion
+
+        #region Sink Options Parsing
+
+        /// <summary>
+        /// Constrói SinkOptions agregando todos os sinks configurados.
+        /// CC: ~2
+        /// </summary>
+        private SinkOptions ParseSinkOptions(IConfigurationSection section)
+        {
+            var sinksSection = section.GetSection("Sinks");
+            if (!sinksSection.Exists())
+                return null;
+
+            var consoleOptions = ParseConsoleSinkOptions(sinksSection);
+            var fileOptions = ParseFileSinkOptions(sinksSection);
+            var blobOptions = ParseBlobStorageSinkOptions(sinksSection);
+            var dynatraceOptions = ParseDynatraceSinkOptions(sinksSection);
+
+            return new SinkOptions(
+                consoleOptions,
+                fileOptions,
+                blobOptions,
+                dynatraceOptions
+            );
+        }
+
+        /// <summary>
+        /// Constrói ConsoleSinkOptions a partir da seção "Sinks:Console".
+        /// CC: ~3-6
+        /// </summary>
+        private ConsoleSinkOptions ParseConsoleSinkOptions(IConfigurationSection sinksSection)
+        {
+            var consoleSection = sinksSection.GetSection("Console");
+            if (!consoleSection.Exists())
+                return null;
+
+            var consoleEnabled = ParseBool(consoleSection, "Enabled");
+            return new ConsoleSinkOptions(consoleEnabled);
+        }
+
+        /// <summary>
+        /// Constrói FileSinkOptions a partir da seção "Sinks:File".
+        /// CC: ~3-6
+        /// </summary>
+        private FileSinkOptions ParseFileSinkOptions(IConfigurationSection sinksSection)
+        {
+            var fileSection = sinksSection.GetSection("File");
+            if (!fileSection.Exists())
+                return null;
+
+            var fileEnabled = ParseBool(fileSection, "Enabled");
+            var filePath = ParseString(fileSection, "Path");
+
+            return new FileSinkOptions(fileEnabled, filePath);
+        }
+
+        /// <summary>
+        /// Constrói BlobStorageSinkOptions a partir da seção "Sinks:BlobStorage".
+        /// CC: ~3-6
+        /// </summary>
+        private BlobStorageSinkOptions ParseBlobStorageSinkOptions(IConfigurationSection sinksSection)
+        {
+            var blobSection = sinksSection.GetSection("BlobStorage");
+            if (!blobSection.Exists())
+                return null;
+
+            var blobEnabled = ParseBool(blobSection, "Enabled");
+            var connectionString = ParseString(blobSection, "ConnectionString");
+            var containerName = ParseString(blobSection, "ContainerName");
+
+            return new BlobStorageSinkOptions(
+                blobEnabled,
+                connectionString,
+                containerName
+            );
+        }
+
+        /// <summary>
+        /// Constrói DynatraceSinkOptions a partir da seção "Sinks:Dynatrace".
+        /// CC: ~4-10
+        /// </summary>
+        private DynatraceSinkOptions ParseDynatraceSinkOptions(IConfigurationSection sinksSection)
+        {
+            var dynatraceSection = sinksSection.GetSection("Dynatrace");
+            if (!dynatraceSection.Exists())
+                return null;
+
+            var dynatraceEnabled = ParseBool(dynatraceSection, "Enabled");
+            var endpoint = ParseString(dynatraceSection, "Endpoint");
+            var apiToken = ParseString(dynatraceSection, "ApiToken");
+            var timeoutSeconds = ParseInt(dynatraceSection, "TimeoutSeconds");
+
+            return new DynatraceSinkOptions(
+                dynatraceEnabled,
+                endpoint,
+                apiToken,
+                timeoutSeconds
+            );
+        }
+
+        #endregion
+
+        #region Batch Options Parsing
+
+        /// <summary>
+        /// Constrói BatchOptions a partir da seção "Batch".
+        /// CC: ~4-7
+        /// </summary>
+        private BatchOptions ParseBatchOptions(IConfigurationSection section)
+        {
+            var batchSection = section.GetSection("Batch");
+            if (!batchSection.Exists())
+                return null;
+
+            var batchSize = ParseInt(batchSection, "BatchSize");
+            var flushIntervalMs = ParseInt(batchSection, "FlushIntervalMs");
+
+            return new BatchOptions(batchSize, flushIntervalMs);
+        }
+
+        #endregion
+
+        #region Generic Parsing Helpers
+
+        /// <summary>
+        /// Parse string opcional de uma seção de configuração.
+        /// Retorna null se valor não existir ou for vazio.
+        /// CC: ~1
+        /// </summary>
+        private string ParseString(IConfigurationSection section, string key)
+        {
+            var value = section[key];
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parse bool opcional de uma seção de configuração.
+        /// Retorna null se valor não existir, for vazio ou inválido.
+        /// CC: ~2
+        /// </summary>
+        private bool? ParseBool(IConfigurationSection section, string key)
+        {
+            var value = section[key];
+            if (!string.IsNullOrWhiteSpace(value) && bool.TryParse(value, out var parsed))
+                return parsed;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parse int opcional de uma seção de configuração.
+        /// Retorna null se valor não existir, for vazio ou inválido.
+        /// CC: ~2
+        /// </summary>
+        private int? ParseInt(IConfigurationSection section, string key)
+        {
+            var value = section[key];
+            if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var parsed))
+                return parsed;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parse enum opcional de uma seção de configuração.
+        /// Retorna null se valor não existir, for vazio ou inválido.
+        /// CC: ~2
+        /// </summary>
+        private T? ParseEnum<T>(IConfigurationSection section, string key) where T : struct, Enum
+        {
+            var value = section[key];
+            if (!string.IsNullOrWhiteSpace(value) && Enum.TryParse<T>(value, ignoreCase: true, out var parsed))
+                return parsed;
+
+            return null;
+        }
+
+        #endregion
     }
 }
