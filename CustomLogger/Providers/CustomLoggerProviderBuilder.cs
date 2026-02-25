@@ -71,9 +71,9 @@ namespace CustomLogger.Providers
             return this;
         }
 
-        public CustomLoggerProviderBuilder AddBlobSink(string connectionString, string container, ILogFormatter formatter = null)
+        public CustomLoggerProviderBuilder AddBlobSink(string connectionString, string container, ILogFormatter formatter = null, string blobName = null)
         {
-            _sinks.Add(new BlobStorageLogSink(connectionString, container, formatter ?? new JsonLogFormatter()));
+            _sinks.Add(new BlobStorageLogSink(connectionString, container, formatter ?? new JsonLogFormatter(), blobName));
             return this;
         }
 
@@ -126,7 +126,7 @@ namespace CustomLogger.Providers
 
             var effectiveMinimumLevel =
                 _loggingOptions.MinimumLogLevel ?? LogLevel.Information;
-            
+
             var effectiveServiceName =
                 _loggingOptions.ServiceName ?? "";
 
@@ -204,7 +204,7 @@ namespace CustomLogger.Providers
             // Validação de ServiceName e Environment
             var serviceName = _loggingOptions.ServiceName;
             if (string.IsNullOrWhiteSpace(serviceName)) throw new InvalidOperationException("ServiceName não pode ser Nulo! Ajuste o Nome do Serviço" +
-                " no appSetting.json ou web.config." );
+                " no appSetting.json ou web.config.");
 
             var envName = _loggingOptions.Environment;
             if (string.IsNullOrWhiteSpace(envName)) throw new InvalidOperationException("Environment não pode ser Nulo! Ajuste o Environment" +

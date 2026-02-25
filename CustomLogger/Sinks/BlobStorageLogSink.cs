@@ -15,12 +15,12 @@ namespace CustomLogger.Sinks
         private readonly ILogFormatter _formatter;
         private readonly AppendBlobClient _blobClient;
         private bool _disposed;
-        private readonly string blobName = $"logs_{DateTime.UtcNow:yyyy-MM-dd}.log";
 
         public BlobStorageLogSink(
             string connectionString,
             string containerName,
-            ILogFormatter formatter)
+            ILogFormatter formatter,
+            string blobName = null)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentException(nameof(connectionString));
@@ -31,6 +31,11 @@ namespace CustomLogger.Sinks
             _formatter = formatter
                 ?? throw new ArgumentNullException(nameof(formatter));
 
+            // Aplica nomenclatura padrão se blobName não for fornecido
+            var resolvedBlobName = string.IsNullOrWhiteSpace(blobName)
+                ? $"logs_{DateTimeOffset.UtcNow:yyyy-MM-dd}.log"
+                : blobName;
+
             var containerClient = new BlobContainerClient(
                 connectionString,
                 containerName);
@@ -38,7 +43,7 @@ namespace CustomLogger.Sinks
             containerClient.CreateIfNotExists();
 
             var appendBlobClient =
-                containerClient.GetAppendBlobClient(blobName);
+                containerClient.GetAppendBlobClient(resolvedBlobName);
 
             appendBlobClient.CreateIfNotExists();
 

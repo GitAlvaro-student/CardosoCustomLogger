@@ -21,13 +21,15 @@ namespace CustomLogger.Sinks
             ILogFormatter formatter,
             bool append = true)
         {
-            if (string.IsNullOrWhiteSpace(filePath))
-                throw new ArgumentException(nameof(filePath));
-
             _formatter = formatter
                 ?? throw new ArgumentNullException(nameof(formatter));
 
-            var directory = Path.GetDirectoryName(filePath);
+            // Aplica nomenclatura padrão se filePath não for fornecido
+            var resolvedPath = string.IsNullOrWhiteSpace(filePath)
+                ? $"logs_{DateTimeOffset.UtcNow:yyyy-MM-dd}.log"
+                : filePath;
+
+            var directory = Path.GetDirectoryName(resolvedPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -35,7 +37,7 @@ namespace CustomLogger.Sinks
 
             // ✅ FileStream com suporte assíncrono
             _fileStream = new FileStream(
-                filePath,
+                resolvedPath,
                 append ? FileMode.Append : FileMode.Create,
                 FileAccess.Write,
                 FileShare.Read,
