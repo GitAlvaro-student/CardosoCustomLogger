@@ -7,268 +7,222 @@ using System.Text;
 
 namespace CustomLogger.Adapters
 {
-    public sealed class NetFrameworkConfigurationAdapter
+    public sealed class FrameworkConfigurationAdapter
     {
         public LoggingOptions CreateFromAppSettings()
         {
             var appSettings = ConfigurationManager.AppSettings;
 
             // MinimumLogLevel
-            LogLevel? minimumLogLevel = null;
-            var levelKey = "CustomLogger:MinimumLogLevel";
-            var levelStr = appSettings[levelKey];
-            if (!string.IsNullOrWhiteSpace(levelStr))
-            {
-                if (Enum.TryParse<LogLevel>(levelStr, ignoreCase: true, out var parsedLevel))
-                {
-                    minimumLogLevel = parsedLevel;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{levelKey}': '{levelStr}'. Esperado um valor válido de LogLevel.");
-                }
-            }
+            var minimumLogLevel = ParseNullableLogLevel(appSettings, "CustomLogger:MinimumLogLevel");
 
-            // ServiceName
-            string serviceName = null;
-            var servNameKey = "CustomLogger:ServiceName";
-            var servNameValue = appSettings[servNameKey];
-            if (!string.IsNullOrWhiteSpace(servNameValue))
-            {
-                serviceName = servNameValue;
-            }
-            else throw new ConfigurationErrorsException($"Valor ausente para '{servNameKey}': '{servNameValue}'. Esperado um valor para ServiceName.");
+            // ServiceName (required)
+            var serviceName = ReadRequiredString(appSettings, "CustomLogger:ServiceName", "ServiceName");
 
-            // Environment
-            string environment = null;
-            var envKey = "CustomLogger:Environment";
-            var envValue = appSettings[envKey];
-            if (!string.IsNullOrWhiteSpace(envValue))
-            {
-                environment = envValue;
-            }
-            else throw new ConfigurationErrorsException($"Valor ausente para '{envKey}': '{envValue}'. Esperado um valor para Environment.");
+            // Environment (required)
+            var environment = ReadRequiredString(appSettings, "CustomLogger:Environment", "Environment");
 
             // BufferOptions
-            BufferOptions bufferOptions = null;
+            var bufferOptions = BuildBufferOptions(appSettings);
 
-            var bufferEnabledKey = "CustomLogger:Buffer:Enabled";
-            var bufferEnabledValue = appSettings[bufferEnabledKey];
-            bool? bufferEnabled = null;
-            if (!string.IsNullOrWhiteSpace(bufferEnabledValue))
-            {
-                if (bool.TryParse(bufferEnabledValue, out var parsedEnabled))
-                {
-                    bufferEnabled = parsedEnabled;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{bufferEnabledKey}': '{bufferEnabledValue}'. Esperado 'true' ou 'false'.");
-                }
-            }
+            // SinkOptions (console, file, blob, dynatrace)
+            var consoleOptions = BuildConsoleOptions(appSettings);
+            var fileOptions = BuildFileOptions(appSettings);
+            var blobOptions = BuildBlobOptions(appSettings);
+            var dynatraceOptions = BuildDynatraceOptions(appSettings);
 
-            var maxSizeKey = "CustomLogger:Buffer:MaxSize";
-            var maxSizeValue = appSettings[maxSizeKey];
-            int? maxSize = null;
-            if (!string.IsNullOrWhiteSpace(maxSizeValue))
-            {
-                if (int.TryParse(maxSizeValue, out var parsedMaxSize))
-                {
-                    maxSize = parsedMaxSize;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{maxSizeKey}': '{maxSizeValue}'. Esperado um número inteiro.");
-                }
-            }
-
-            if (bufferEnabled.HasValue || maxSize.HasValue)
-            {
-                bufferOptions = new BufferOptions(bufferEnabled, maxSize);
-            }
-
-            // SinkOptions
             SinkOptions sinkOptions = null;
-
-            // Console
-            ConsoleSinkOptions consoleOptions = null;
-            var consoleEnabledKey = "CustomLogger:Sinks:Console:Enabled";
-            var consoleEnabledValue = appSettings[consoleEnabledKey];
-            bool? consoleEnabled = null;
-            if (!string.IsNullOrWhiteSpace(consoleEnabledValue))
-            {
-                if (bool.TryParse(consoleEnabledValue, out var parsedConsoleEnabled))
-                {
-                    consoleEnabled = parsedConsoleEnabled;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{consoleEnabledKey}': '{consoleEnabledValue}'. Esperado 'true' ou 'false'.");
-                }
-
-                consoleOptions = new ConsoleSinkOptions(consoleEnabled);
-            }
-
-            // File
-            FileSinkOptions fileOptions = null;
-            var fileEnabledKey = "CustomLogger:Sinks:File:Enabled";
-            var fileEnabledValue = appSettings[fileEnabledKey];
-            bool? fileEnabled = null;
-            if (!string.IsNullOrWhiteSpace(fileEnabledValue))
-            {
-                if (bool.TryParse(fileEnabledValue, out var parsedFileEnabled))
-                {
-                    fileEnabled = parsedFileEnabled;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{fileEnabledKey}': '{fileEnabledValue}'. Esperado 'true' ou 'false'.");
-                }
-            }
-
-            var filePathKey = "CustomLogger:Sinks:File:Path";
-            var filePath = appSettings[filePathKey];
-
-            if (fileEnabled.HasValue || !string.IsNullOrWhiteSpace(filePath))
-            {
-                fileOptions = new FileSinkOptions(fileEnabled, filePath);
-            }
-
-            // BlobStorage
-            BlobStorageSinkOptions blobOptions = null;
-            var blobEnabledKey = "CustomLogger:Sinks:BlobStorage:Enabled";
-            var blobEnabledValue = appSettings[blobEnabledKey];
-            bool? blobEnabled = null;
-            if (!string.IsNullOrWhiteSpace(blobEnabledValue))
-            {
-                if (bool.TryParse(blobEnabledValue, out var parsedBlobEnabled))
-                {
-                    blobEnabled = parsedBlobEnabled;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{blobEnabledKey}': '{blobEnabledValue}'. Esperado 'true' ou 'false'.");
-                }
-            }
-
-            var connectionStringKey = "CustomLogger:Sinks:BlobStorage:ConnectionString";
-            var connectionString = appSettings[connectionStringKey];
-
-            var containerNameKey = "CustomLogger:Sinks:BlobStorage:ContainerName";
-            var containerName = appSettings[containerNameKey];
-
-            if (blobEnabled.HasValue || !string.IsNullOrWhiteSpace(connectionString) || !string.IsNullOrWhiteSpace(containerName))
-            {
-                blobOptions = new BlobStorageSinkOptions(blobEnabled, connectionString, containerName);
-            }
-
-            // Dynatrace
-            DynatraceSinkOptions dynatraceOptions = null;
-
-            var dynatraceEnabledKey = "CustomLogger:Sinks:Dynatrace:Enabled";
-            var dynatraceEnabledValue = appSettings[dynatraceEnabledKey];
-            bool? dynatraceEnabled = null;
-            if (!string.IsNullOrWhiteSpace(dynatraceEnabledValue))
-            {
-                if (bool.TryParse(dynatraceEnabledValue, out var parsedDynatraceEnabled))
-                {
-                    dynatraceEnabled = parsedDynatraceEnabled;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{dynatraceEnabledKey}': '{dynatraceEnabledValue}'.");
-                }
-            }
-
-            var endpointKey = "CustomLogger:Sinks:Dynatrace:Endpoint";
-            var endpoint = appSettings[endpointKey];
-
-            var apiTokenKey = "CustomLogger:Sinks:Dynatrace:ApiToken";
-            var apiToken = appSettings[apiTokenKey];
-
-            var timeoutKey = "CustomLogger:Sinks:Dynatrace:TimeoutSeconds";
-            var timeoutValue = appSettings[timeoutKey];
-            int? timeoutSeconds = null;
-            if (!string.IsNullOrWhiteSpace(timeoutValue))
-            {
-                if (int.TryParse(timeoutValue, out var parsedTimeout))
-                {
-                    timeoutSeconds = parsedTimeout;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{timeoutKey}': '{timeoutValue}'.");
-                }
-            }
-
-            if (dynatraceEnabled.HasValue || !string.IsNullOrWhiteSpace(endpoint) ||
-                !string.IsNullOrWhiteSpace(apiToken) || timeoutSeconds.HasValue)
-            {
-                dynatraceOptions = new DynatraceSinkOptions(
-                    dynatraceEnabled,
-                    endpoint,
-                    apiToken,
-                    timeoutSeconds
-                );
-            }
-
-            if (consoleOptions != null || fileOptions != null ||
-                blobOptions != null || dynatraceOptions != null) // Alterado
+            if (consoleOptions != null || fileOptions != null || blobOptions != null || dynatraceOptions != null)
             {
                 sinkOptions = new SinkOptions(
                     consoleOptions,
                     fileOptions,
                     blobOptions,
-                    dynatraceOptions // NOVO
+                    dynatraceOptions
                 );
             }
 
-            BatchOptions batchOptions = null;
+            // BatchOptions
+            var batchOptions = BuildBatchOptions(appSettings);
 
+            return new LoggingOptions(
+                minimumLogLevel,
+                serviceName,
+                environment,
+                bufferOptions,
+                batchOptions,
+                sinkOptions
+            );
+        }
+
+        #region Helpers: parsing / validation / object construction
+        private LogLevel? ParseNullableLogLevel(System.Collections.Specialized.NameValueCollection appSettings, string key)
+        {
+            var value = appSettings[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (Enum.TryParse<LogLevel>(value, ignoreCase: true, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new ConfigurationErrorsException($"Valor inválido para '{key}': '{value}'. Esperado um valor válido de LogLevel.");
+        }
+
+        private string ReadRequiredString(System.Collections.Specialized.NameValueCollection appSettings, string key, string expectedName)
+        {
+            var value = appSettings[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            throw new ConfigurationErrorsException($"Valor ausente para '{key}': '{value}'. Esperado um valor para {expectedName}.");
+        }
+
+        private bool? ParseNullableBool(System.Collections.Specialized.NameValueCollection appSettings, string key, string errorTemplate)
+        {
+            var value = appSettings[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (bool.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            // errorTemplate must contain placeholders {0} for key and {1} for value
+            throw new ConfigurationErrorsException(string.Format(errorTemplate, key, value));
+        }
+
+        private int? ParseNullableInt(System.Collections.Specialized.NameValueCollection appSettings, string key, string errorTemplate)
+        {
+            var value = appSettings[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (int.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            // errorTemplate must contain placeholders {0} for key and {1} for value
+            throw new ConfigurationErrorsException(string.Format(errorTemplate, key, value));
+        }
+
+        private BufferOptions BuildBufferOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
+            var enabledKey = "CustomLogger:Buffer:Enabled";
+            var maxSizeKey = "CustomLogger:Buffer:MaxSize";
+
+            var enabled = ParseNullableBool(appSettings, enabledKey, "Valor inválido para '{0}': '{1}'. Esperado 'true' ou 'false'.");
+            var maxSize = ParseNullableInt(appSettings, maxSizeKey, "Valor inválido para '{0}': '{1}'. Esperado um número inteiro.");
+
+            if (enabled.HasValue || maxSize.HasValue)
+            {
+                return new BufferOptions(enabled, maxSize);
+            }
+
+            return null;
+        }
+
+        private ConsoleSinkOptions BuildConsoleOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
+            var key = "CustomLogger:Sinks:Console:Enabled";
+            var raw = appSettings[key];
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            var parsed = ParseNullableBool(appSettings, key, "Valor inválido para '{0}': '{1}'. Esperado 'true' ou 'false'.");
+            // original code created ConsoleSinkOptions when the key exists (non-empty)
+            return new ConsoleSinkOptions(parsed);
+        }
+
+        private FileSinkOptions BuildFileOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
+            var enabledKey = "CustomLogger:Sinks:File:Enabled";
+            var pathKey = "CustomLogger:Sinks:File:Path";
+
+            var enabled = ParseNullableBool(appSettings, enabledKey, "Valor inválido para '{0}': '{1}'. Esperado 'true' ou 'false'.");
+            var path = appSettings[pathKey];
+
+            if (enabled.HasValue || !string.IsNullOrWhiteSpace(path))
+            {
+                return new FileSinkOptions(enabled, path);
+            }
+
+            return null;
+        }
+
+        private BlobStorageSinkOptions BuildBlobOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
+            var enabledKey = "CustomLogger:Sinks:BlobStorage:Enabled";
+            var connKey = "CustomLogger:Sinks:BlobStorage:ConnectionString";
+            var containerKey = "CustomLogger:Sinks:BlobStorage:ContainerName";
+
+            var enabled = ParseNullableBool(appSettings, enabledKey, "Valor inválido para '{0}': '{1}'. Esperado 'true' ou 'false'.");
+            var connectionString = appSettings[connKey];
+            var containerName = appSettings[containerKey];
+
+            if (enabled.HasValue || !string.IsNullOrWhiteSpace(connectionString) || !string.IsNullOrWhiteSpace(containerName))
+            {
+                return new BlobStorageSinkOptions(enabled, connectionString, containerName);
+            }
+
+            return null;
+        }
+
+        private DynatraceSinkOptions BuildDynatraceOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
+            var enabledKey = "CustomLogger:Sinks:Dynatrace:Enabled";
+            var endpointKey = "CustomLogger:Sinks:Dynatrace:Endpoint";
+            var apiTokenKey = "CustomLogger:Sinks:Dynatrace:ApiToken";
+            var timeoutKey = "CustomLogger:Sinks:Dynatrace:TimeoutSeconds";
+
+            var enabled = ParseNullableBool(appSettings, enabledKey, "Valor inválido para '{0}': '{1}'.");
+            var endpoint = appSettings[endpointKey];
+            var apiToken = appSettings[apiTokenKey];
+            var timeout = ParseNullableInt(appSettings, timeoutKey, "Valor inválido para '{0}': '{1}'.");
+
+            if (enabled.HasValue || !string.IsNullOrWhiteSpace(endpoint) ||
+                !string.IsNullOrWhiteSpace(apiToken) || timeout.HasValue)
+            {
+                return new DynatraceSinkOptions(
+                    enabled,
+                    endpoint,
+                    apiToken,
+                    timeout
+                );
+            }
+
+            return null;
+        }
+
+        private BatchOptions BuildBatchOptions(System.Collections.Specialized.NameValueCollection appSettings)
+        {
             var batchSizeKey = "CustomLogger:Batch:BatchSize";
-            var batchSizeValue = appSettings[batchSizeKey];
-            int? batchSize = null;
-            if (!string.IsNullOrWhiteSpace(batchSizeValue))
-            {
-                if (int.TryParse(batchSizeValue, out var parsedBatchSize))
-                {
-                    batchSize = parsedBatchSize;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{batchSizeKey}': '{batchSizeValue}'. Esperado um número inteiro.");
-                }
-            }
-
             var batchIntervalKey = "CustomLogger:Batch:FlushIntervalMs";
-            var batchIntervalValue = appSettings[batchIntervalKey];
-            int? flushIntervalMs = null;
-            if (!string.IsNullOrWhiteSpace(batchIntervalValue))
-            {
-                if (int.TryParse(batchIntervalValue, out var parsedFlushInterval))
-                {
-                    flushIntervalMs = parsedFlushInterval;
-                }
-                else
-                {
-                    throw new ConfigurationErrorsException($"Valor inválido para '{batchIntervalKey}': '{batchIntervalValue}'. Esperado um número inteiro.");
-                }
-            }
+
+            var batchSize = ParseNullableInt(appSettings, batchSizeKey, "Valor inválido para '{0}': '{1}'. Esperado um número inteiro.");
+            var flushIntervalMs = ParseNullableInt(appSettings, batchIntervalKey, "Valor inválido para '{0}': '{1}'. Esperado um número inteiro.");
 
             if (batchSize.HasValue || flushIntervalMs.HasValue)
             {
-                batchOptions = new BatchOptions(batchSize, flushIntervalMs);
+                return new BatchOptions(batchSize, flushIntervalMs);
             }
 
-            return new LoggingOptions(
-                    minimumLogLevel,
-                    serviceName,
-                    environment,
-                    bufferOptions,
-                    batchOptions,
-                    sinkOptions
-                );
+            return null;
         }
+        #endregion
     }
 }
 

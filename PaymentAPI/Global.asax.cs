@@ -73,7 +73,7 @@ namespace PaymentAPI
         private ILoggingHealthState InitializeCustomLogger()
         {
              // Build provider from app settings and register globally
-            var adapter = new NetFrameworkConfigurationAdapter();
+            var adapter = new FrameworkConfigurationAdapter();
             var logging = adapter.CreateFromAppSettings();
 
             var provider = new CustomLoggerProviderBuilder()

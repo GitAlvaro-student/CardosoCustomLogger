@@ -126,7 +126,7 @@ namespace CustomLogger.Providers
 
             var effectiveMinimumLevel =
                 _loggingOptions.MinimumLogLevel ?? LogLevel.Information;
-            
+
             var effectiveServiceName =
                 _loggingOptions.ServiceName ?? "";
 
@@ -196,93 +196,169 @@ namespace CustomLogger.Providers
         }
 
 
+        /// <summary>
+        /// Valida a configuração do logging antes de construir o provider.
+        /// 
+        /// REFATORADO: CC = 1 (ANTES: CC = 60)
+        /// Complexidade delegada para métodos privados coesos.
+        /// 
+        /// Lança InvalidOperationException se configuração for inválida.
+        /// </summary>
         private void ValidateConfiguration()
         {
             if (_validated)
                 return;
 
-            // Validação de ServiceName e Environment
-            var serviceName = _loggingOptions.ServiceName;
-            if (string.IsNullOrWhiteSpace(serviceName)) throw new InvalidOperationException("ServiceName não pode ser Nulo! Ajuste o Nome do Serviço" +
-                " no appSetting.json ou web.config." );
-
-            var envName = _loggingOptions.Environment;
-            if (string.IsNullOrWhiteSpace(envName)) throw new InvalidOperationException("Environment não pode ser Nulo! Ajuste o Environment" +
-                " no appSetting.json ou web.config.");
-
-            // Validação de configuração
-            var buffer = _loggingOptions.BufferOptions;
-            if (buffer != null && buffer.Enabled.HasValue && buffer.Enabled.Value)
-            {
-                if (!buffer.MaxSize.HasValue || buffer.MaxSize.Value <= 0)
-                {
-                    throw new InvalidOperationException(
-                        "BufferOptions.MaxSize deve ser maior que zero quando BufferOptions.Enabled é true.");
-                }
-
-                var batch = _loggingOptions.BatchOptions;
-                if (batch != null)
-                {
-                    if (batch.BatchSize.HasValue && batch.BatchSize.Value <= 0)
-                    {
-                        throw new InvalidOperationException("BatchOptions.BatchSize deve ser maior que zero.");
-                    }
-                }
-            }
-
-            // Valida FileSink
-            var fileSink = _loggingOptions.SinkOptions?.File;
-            if (fileSink != null && fileSink.Enabled.HasValue && fileSink.Enabled.Value)
-            {
-                if (string.IsNullOrWhiteSpace(fileSink.Path))
-                {
-                    throw new InvalidOperationException(
-                        "FileSinkOptions.Path não pode ser vazio quando FileSinkOptions.Enabled é true.");
-                }
-            }
-
-            // Valida BlobStorageSink
-            var blobSink = _loggingOptions.SinkOptions?.BlobStorage;
-            if (blobSink != null && blobSink.Enabled.HasValue && blobSink.Enabled.Value)
-            {
-                if (string.IsNullOrWhiteSpace(blobSink.ConnectionString))
-                {
-                    throw new InvalidOperationException(
-                        "BlobStorageSinkOptions.ConnectionString não pode ser vazio quando BlobStorageSinkOptions.Enabled é true.");
-                }
-
-                if (string.IsNullOrWhiteSpace(blobSink.ContainerName))
-                {
-                    throw new InvalidOperationException(
-                        "BlobStorageSinkOptions.ContainerName não pode ser vazio quando BlobStorageSinkOptions.Enabled é true.");
-                }
-            }
-
-            // Valida DynatraceSink
-            var dynatraceSink = _loggingOptions.SinkOptions?.Dynatrace;
-            if (dynatraceSink != null && dynatraceSink.Enabled.HasValue && dynatraceSink.Enabled.Value)
-            {
-                if (string.IsNullOrWhiteSpace(dynatraceSink.Endpoint))
-                {
-                    throw new InvalidOperationException(
-                        "DynatraceSinkOptions.Endpoint não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
-                }
-
-                if (string.IsNullOrWhiteSpace(dynatraceSink.ApiToken))
-                {
-                    throw new InvalidOperationException(
-                        "DynatraceSinkOptions.ApiToken não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
-                }
-
-                if (dynatraceSink.TimeoutSeconds.HasValue && dynatraceSink.TimeoutSeconds.Value <= 0)
-                {
-                    throw new InvalidOperationException(
-                        "DynatraceSinkOptions.TimeoutSeconds deve ser maior que zero.");
-                }
-            }
+            // Delegação para métodos de validação específicos
+            ValidateCoreOptions();
+            ValidateBufferOptions();
+            ValidateBatchOptions();
+            ValidateFileSink();
+            ValidateBlobStorageSink();
+            ValidateDynatraceSink();
 
             _validated = true;
         }
+
+        #region Core Options Validation
+
+        /// <summary>
+        /// Valida campos obrigatórios do nível raiz (ServiceName, Environment).
+        /// CC: ~2
+        /// </summary>
+        private void ValidateCoreOptions()
+        {
+            var serviceName = _loggingOptions.ServiceName;
+            if (string.IsNullOrWhiteSpace(serviceName))
+                throw new InvalidOperationException(
+                    "ServiceName não pode ser Nulo! Ajuste o Nome do Serviço no appSetting.json ou web.config.");
+
+            var envName = _loggingOptions.Environment;
+            if (string.IsNullOrWhiteSpace(envName))
+                throw new InvalidOperationException(
+                    "Environment não pode ser Nulo! Ajuste o Environment no appSetting.json ou web.config.");
+        }
+
+        #endregion
+
+        #region Buffer and Batch Options Validation
+
+        /// <summary>
+        /// Valida BufferOptions quando habilitado.
+        /// CC: ~6
+        /// </summary>
+        private void ValidateBufferOptions()
+        {
+            var buffer = _loggingOptions.BufferOptions;
+
+            // Guard clause: Skip se buffer não habilitado
+            if (buffer == null || !buffer.Enabled.HasValue || !buffer.Enabled.Value)
+                return;
+
+            // Validação de MaxSize quando buffer habilitado
+            if (!buffer.MaxSize.HasValue || buffer.MaxSize.Value <= 0)
+                throw new InvalidOperationException(
+                    "BufferOptions.MaxSize deve ser maior que zero quando BufferOptions.Enabled é true.");
+        }
+
+        /// <summary>
+        /// Valida BatchOptions quando Buffer está habilitado.
+        /// CC: ~6
+        /// </summary>
+        private void ValidateBatchOptions()
+        {
+            var buffer = _loggingOptions.BufferOptions;
+
+            // Guard clause: Skip se buffer não habilitado
+            if (buffer == null || !buffer.Enabled.HasValue || !buffer.Enabled.Value)
+                return;
+
+            var batch = _loggingOptions.BatchOptions;
+
+            // Guard clause: Skip se batch não configurado
+            if (batch == null)
+                return;
+
+            // Validação de BatchSize quando batch existe e buffer habilitado
+            if (batch.BatchSize.HasValue && batch.BatchSize.Value <= 0)
+                throw new InvalidOperationException(
+                    "BatchOptions.BatchSize deve ser maior que zero.");
+        }
+
+        #endregion
+
+        #region Sink Options Validation
+
+        /// <summary>
+        /// Valida FileSink quando habilitado.
+        /// CC: ~4
+        /// </summary>
+        private void ValidateFileSink()
+        {
+            var fileSink = _loggingOptions.SinkOptions?.File;
+
+            // Guard clause: Skip se sink não habilitado
+            if (fileSink == null || !fileSink.Enabled.HasValue || !fileSink.Enabled.Value)
+                return;
+
+            // Validação de Path quando sink habilitado
+            if (string.IsNullOrWhiteSpace(fileSink.Path))
+                throw new InvalidOperationException(
+                    "FileSinkOptions.Path não pode ser vazio quando FileSinkOptions.Enabled é true.");
+        }
+
+        /// <summary>
+        /// Valida BlobStorageSink quando habilitado.
+        /// CC: ~6
+        /// </summary>
+        private void ValidateBlobStorageSink()
+        {
+            var blobSink = _loggingOptions.SinkOptions?.BlobStorage;
+
+            // Guard clause: Skip se sink não habilitado
+            if (blobSink == null || !blobSink.Enabled.HasValue || !blobSink.Enabled.Value)
+                return;
+
+            // Validação de ConnectionString quando sink habilitado
+            if (string.IsNullOrWhiteSpace(blobSink.ConnectionString))
+                throw new InvalidOperationException(
+                    "BlobStorageSinkOptions.ConnectionString não pode ser vazio quando BlobStorageSinkOptions.Enabled é true.");
+
+            // Validação de ContainerName quando sink habilitado
+            if (string.IsNullOrWhiteSpace(blobSink.ContainerName))
+                throw new InvalidOperationException(
+                    "BlobStorageSinkOptions.ContainerName não pode ser vazio quando BlobStorageSinkOptions.Enabled é true.");
+        }
+
+        /// <summary>
+        /// Valida DynatraceSink quando habilitado.
+        /// CC: ~8
+        /// </summary>
+        private void ValidateDynatraceSink()
+        {
+            var dynatraceSink = _loggingOptions.SinkOptions?.Dynatrace;
+
+            // Guard clause: Skip se sink não habilitado
+            if (dynatraceSink == null || !dynatraceSink.Enabled.HasValue || !dynatraceSink.Enabled.Value)
+                return;
+
+            // Validação de Endpoint quando sink habilitado
+            if (string.IsNullOrWhiteSpace(dynatraceSink.Endpoint))
+                throw new InvalidOperationException(
+                    "DynatraceSinkOptions.Endpoint não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
+
+            // Validação de ApiToken quando sink habilitado
+            if (string.IsNullOrWhiteSpace(dynatraceSink.ApiToken))
+                throw new InvalidOperationException(
+                    "DynatraceSinkOptions.ApiToken não pode ser vazio quando DynatraceSinkOptions.Enabled é true.");
+
+            // Validação de TimeoutSeconds quando especificado
+            if (dynatraceSink.TimeoutSeconds.HasValue && dynatraceSink.TimeoutSeconds.Value <= 0)
+                throw new InvalidOperationException(
+                    "DynatraceSinkOptions.TimeoutSeconds deve ser maior que zero.");
+        }
+
+        #endregion
 
         private CustomProviderOptions ConvertToCustomProviderOptions()
         {

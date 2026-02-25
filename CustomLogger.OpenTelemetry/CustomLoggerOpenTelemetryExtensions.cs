@@ -2,8 +2,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Trace;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CustomLogger.OpenTelemetry
 {
@@ -30,6 +28,9 @@ namespace CustomLogger.OpenTelemetry
         /// <summary>
         /// Adiciona integração CustomLogger com OpenTelemetry usando configuração de appsettings.json
         /// com possibilidade de override via API fluente.
+        /// 
+        /// REFATORADO: CC = 1 (ANTES: CC = 10)
+        /// Complexidade delegada para métodos privados coesos.
         /// </summary>
         /// <param name="services">Service collection.</param>
         /// <param name="configuration">Configuration root.</param>
@@ -40,12 +41,60 @@ namespace CustomLogger.OpenTelemetry
             IConfiguration configuration,
             Action<CustomLoggerOpenTelemetryOptions> configureOptions)
         {
+            // Delegação para métodos privados (CC: +0 cada)
+            ValidateArguments(services, configuration);
+
+            var options = BuildOptions(configuration, configureOptions);
+
+            // Guard clause: Skip se OpenTelemetry desabilitado
+            if (!options.Enabled)                                  // CC: +1
+                return services;
+
+            // Registrar OpenTelemetry com configuração delegada
+            services.AddOpenTelemetry()
+                .WithTracing(builder =>
+                {
+                    // Adiciona source do CustomLogger
+                    builder.AddSource(LoggerActivitySource.Source.Name);
+
+                    // Configuração delegada para métodos privados
+                    ConfigureInstrumentations(builder, options.Instrumentations);
+                    ConfigureExporter(builder, options.Exporter);
+                });
+
+            return services;
+        }
+
+        #region Validation
+
+        /// <summary>
+        /// Valida argumentos obrigatórios.
+        /// CC: ~2
+        /// </summary>
+        private static void ValidateArguments(
+            IServiceCollection services,
+            IConfiguration configuration)
+        {
             if (services == null)
                 throw new ArgumentNullException(nameof(services));
 
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
+        }
 
+        #endregion
+
+        #region Options Building
+
+        /// <summary>
+        /// Constrói opções de OpenTelemetry a partir de IConfiguration.
+        /// Aplica override fluente se fornecido.
+        /// CC: ~1
+        /// </summary>
+        private static CustomLoggerOpenTelemetryOptions BuildOptions(
+            IConfiguration configuration,
+            Action<CustomLoggerOpenTelemetryOptions> configureOptions)
+        {
             // 1. Bind da configuração
             var options = new CustomLoggerOpenTelemetryOptions();
             var section = configuration.GetSection(ConfigurationSection);
@@ -54,49 +103,71 @@ namespace CustomLogger.OpenTelemetry
             // 2. Aplicar override fluente (se fornecido)
             configureOptions?.Invoke(options);
 
-            // 3. Se desabilitado, não registrar OpenTelemetry
-            if (!options.Enabled)
-                return services;
-
-            // 4. Registrar OpenTelemetry com instrumentações condicionais
-            services.AddOpenTelemetry()
-                .WithTracing(builder =>
-                {
-                    // Adiciona source do CustomLogger
-                    builder.AddSource(LoggerActivitySource.Source.Name);
-
-                    // Instrumentações condicionais
-                    if (options.Instrumentations.AspNetCore)
-                    {
-                        builder.AddAspNetCoreInstrumentation();
-                    }
-
-                    if (options.Instrumentations.HttpClient)
-                    {
-                        builder.AddHttpClientInstrumentation();
-                    }
-
-                    //if (options.Instrumentations.Oracle)
-                    //{
-                    //    builder.AddOracleDataProviderInstrumentation();
-                    //}
-
-                    // Exporter condicional
-                    if (!string.IsNullOrWhiteSpace(options.Exporter))
-                    {
-                        switch (options.Exporter.ToLowerInvariant())
-                        {
-                            case "otlp":
-                                builder.AddOtlpExporter();
-                                break;
-                            case "console":
-                                builder.AddConsoleExporter();
-                                break;
-                        }
-                    }
-                });
-
-            return services;
+            return options;
         }
+
+        #endregion
+
+        #region Instrumentations Configuration
+
+        /// <summary>
+        /// Configura instrumentações do OpenTelemetry baseado nas opções.
+        /// CC: ~2
+        /// </summary>
+        private static void ConfigureInstrumentations(
+            TracerProviderBuilder builder,
+            CustomLoggerInstrumentationOptions instrumentations)
+        {
+            // Instrumentação AspNetCore condicional
+            if (instrumentations.AspNetCore)
+                builder.AddAspNetCoreInstrumentation();
+
+            // Instrumentação HttpClient condicional
+            if (instrumentations.HttpClient)
+                builder.AddHttpClientInstrumentation();
+
+            // Instrumentação Oracle (comentada - exemplo para futura implementação)
+            //if (instrumentations.Oracle)
+            //    builder.AddOracleDataProviderInstrumentation();
+        }
+
+        #endregion
+
+        #region Exporter Configuration
+
+        /// <summary>
+        /// Configura exporter do OpenTelemetry baseado na string de configuração.
+        /// CC: ~4
+        /// </summary>
+        private static void ConfigureExporter(
+            TracerProviderBuilder builder,
+            string exporter)
+        {
+            // Guard clause: Skip se exporter não configurado
+            if (string.IsNullOrWhiteSpace(exporter))
+                return;
+
+            // Adicionar exporter baseado em configuração
+            switch (exporter.ToLowerInvariant())
+            {
+                case "otlp":
+                    builder.AddOtlpExporter();
+                    break;
+
+                case "console":
+                    builder.AddConsoleExporter();
+                    break;
+
+                    // Outros exporters podem ser adicionados aqui:
+                    // case "jaeger":
+                    //     builder.AddJaegerExporter();
+                    //     break;
+                    // case "zipkin":
+                    //     builder.AddZipkinExporter();
+                    //     break;
+            }
+        }
+
+        #endregion
     }
 }

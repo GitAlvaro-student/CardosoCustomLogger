@@ -306,7 +306,7 @@ namespace CustomLogger.Providers
             }
         }
 
-        IReadOnlyList<SinkHealthSnapshot> ILoggingHealthState.SinkStates
+                IReadOnlyList<SinkHealthSnapshot> ILoggingHealthState.SinkStates
         {
             get
             {
@@ -314,70 +314,7 @@ namespace CustomLogger.Providers
 
                 try
                 {
-                    if (_trackedSinks != null && _trackedSinks.Count > 0)
-                    {
-                        foreach (var sink in _trackedSinks)
-                        {
-                            if (sink == null)
-                                continue;
-
-                            // If sink is a CompositeLogSink, try to enumerate inner sinks (reflection fallback)
-                            if (sink is CompositeLogSink composite)
-                            {
-                                // Try to reflect private readonly field "_sinks"
-                                var fi = composite.GetType().GetField("_sinks", BindingFlags.NonPublic | BindingFlags.Instance);
-                                if (fi != null)
-                                {
-                                    var value = fi.GetValue(composite) as IEnumerable<ILogSink>;
-                                    if (value != null)
-                                    {
-                                        foreach (var inner in value)
-                                        {
-                                            if (inner == null) continue;
-
-                                            bool isOperational = true;
-                                            string statusMessage = null;
-
-                                            var degradable = inner as DegradableLogSink;
-                                            if (degradable != null && degradable.IsDegraded)
-                                            {
-                                                isOperational = false;
-                                                statusMessage = "Degraded";
-                                            }
-
-                                            snapshots.Add(new SinkHealthSnapshot(
-                                                name: inner.GetType().Name,
-                                                type: inner.GetType().FullName,
-                                                isOperational: isOperational,
-                                                statusMessage: statusMessage
-                                            ));
-                                        }
-
-                                        // continue to next tracked sink
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            // Normal (non-composite) sink handling
-                            bool operationalFlag = true;
-                            string status = null;
-
-                            var d = sink as DegradableLogSink;
-                            if (d != null && d.IsDegraded)
-                            {
-                                operationalFlag = false;
-                                status = "Degraded";
-                            }
-
-                            snapshots.Add(new SinkHealthSnapshot(
-                                name: sink.GetType().Name,
-                                type: sink.GetType().FullName,
-                                isOperational: operationalFlag,
-                                statusMessage: status
-                            ));
-                        }
-                    }
+                    ProcessTrackedSinks(snapshots);
                 }
                 catch
                 {
@@ -386,6 +323,101 @@ namespace CustomLogger.Providers
 
                 return snapshots.AsReadOnly();
             }
+        }
+
+        /// <summary>
+        /// Processa todos os sinks rastreados e adiciona seus snapshots à lista.
+        /// Gerencia tanto sinks compostos (com decomposição) quanto sinks normais.
+        /// CC: ~3
+        /// </summary>
+        private void ProcessTrackedSinks(List<SinkHealthSnapshot> snapshots)
+        {
+            // Guard clause: sinks não inicializados ou vazios
+            if (_trackedSinks == null || _trackedSinks.Count == 0)
+                return;
+
+            foreach (var sink in _trackedSinks)
+            {
+                // Guard clause: null safety
+                if (sink == null)
+                    continue;
+
+                // Tentar extrair snapshots de um sink composto
+                var compositeSnapshots = ExtractCompositeSnapshot(sink);
+                if (compositeSnapshots != null && compositeSnapshots.Count > 0)
+                {
+                    snapshots.AddRange(compositeSnapshots);
+                    continue;
+                }
+
+                // Processar sink normal
+                var normalSnapshot = ComputeSinkHealthSnapshot(sink);
+                snapshots.Add(normalSnapshot);
+            }
+        }
+
+        /// <summary>
+        /// Extrai snapshots de um sink composto via reflection.
+        /// Retorna lista vazia se não for composto ou se a reflexão falhar.
+        /// CC: ~4
+        /// </summary>
+        private List<SinkHealthSnapshot> ExtractCompositeSnapshot(ILogSink sink)
+        {
+            var result = new List<SinkHealthSnapshot>();
+
+            // Guard clause: tipo check
+            if (!(sink is CompositeLogSink composite))
+                return result;
+
+            // Tentar refletir o campo "_sinks"
+            var fieldInfo = composite.GetType().GetField(
+                "_sinks",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (fieldInfo == null)
+                return result;
+
+            var innerSinks = fieldInfo.GetValue(composite) as IEnumerable<ILogSink>;
+            if (innerSinks == null)
+                return result;
+
+            // Processar cada sink interno
+            foreach (var innerSink in innerSinks)
+            {
+                if (innerSink == null)
+                    continue;
+
+                var snapshot = ComputeSinkHealthSnapshot(innerSink);
+                result.Add(snapshot);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Computa um snapshot de saúde para um sink individual.
+        /// Centraliza a lógica de detecção de degradação e criação de snapshot.
+        /// CC: ~2
+        /// </summary>
+        private SinkHealthSnapshot ComputeSinkHealthSnapshot(ILogSink sink)
+        {
+            bool isOperational = true;
+            string statusMessage = null;
+
+            // Verificar se sink é degradável e está em modo degradado
+            var degradable = sink as DegradableLogSink;
+            if (degradable != null && degradable.IsDegraded)
+            {
+                isOperational = false;
+                statusMessage = "Degraded";
+            }
+
+            return new SinkHealthSnapshot(
+                name: sink.GetType().Name,
+                type: sink.GetType().FullName,
+                isOperational: isOperational,
+                statusMessage: statusMessage
+            );
         }
     }
 }

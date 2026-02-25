@@ -30,17 +30,8 @@ namespace CustomLogger.Sinks
 
             try
             {
-                // ✅ MODIFICADO: Usar ConsoleColorManager para cores
-                if (ConsoleColorManager.IsOutputToRealConsole())
-                {
-                    string formattedMessage = _formatter.Format(entry);
-                    ConsoleColorManager.WriteColoredLine(formattedMessage, entry.LogLevel);
-                }
-                else
-                {
-                    // ✅ COMPATIBILIDADE: Se output redirecionado, comportamento original
-                    Console.WriteLine(_formatter.Format(entry));
-                }
+                string formattedMessage = _formatter.Format(entry);
+                ConsoleColorManager.WriteColoredLine(formattedMessage, entry.LogLevel);
             }
             catch
             {
@@ -56,24 +47,12 @@ namespace CustomLogger.Sinks
 
             try
             {
-                bool isRealConsole = ConsoleColorManager.IsOutputToRealConsole();
-
                 foreach (var entry in entries)
                 {
-                    if (isRealConsole)
-                    {
-                        // ✅ Cada entrada com sua própria cor baseada no LogLevel
-                        string formattedMessage = _formatter.Format(entry);
-                        ConsoleColorManager.WriteColoredLine(formattedMessage, entry.LogLevel);
-                    }
-                    else
-                    {
-                        // ✅ COMPATIBILIDADE: Comportamento original
-                        Console.WriteLine(_formatter.Format(entry));
-                    }
+                    string formattedMessage = _formatter.Format(entry);
+                    ConsoleColorManager.WriteColoredLine(formattedMessage, entry.LogLevel);
                 }
 
-                // ✅ Mantém o flush único (performance)
                 Console.Out.Flush();
             }
             catch
@@ -90,16 +69,8 @@ namespace CustomLogger.Sinks
 
             try
             {
-                if (ConsoleColorManager.IsOutputToRealConsole())
-                {
-                    string formattedMessage = _formatter.Format(entry);
-                    await ConsoleColorManager.WriteColoredLineAsync(formattedMessage, entry.LogLevel, cancellationToken);
-                }
-                else
-                {
-                    // COMPATIBILIDADE: Comportamento original para output redirecionado
-                    await Console.Out.WriteLineAsync(_formatter.Format(entry));
-                }
+                string formattedMessage = _formatter.Format(entry);
+                await ConsoleColorManager.WriteColoredLineAsync(formattedMessage, entry.LogLevel, cancellationToken);
             }
             catch
             {
@@ -115,30 +86,14 @@ namespace CustomLogger.Sinks
 
             try
             {
-                if (ConsoleColorManager.IsOutputToRealConsole())
-                {
-                    // ✅ OTIMIZAÇÃO: Pré-processa todas as entradas
-                    var coloredEntries = entries
-                        .Where(e => e != null)
-                        .Select(e => (Text: _formatter.Format(e), Level: e.LogLevel))
-                        .ToList();
+                var coloredEntries = entries
+                    .Where(e => e != null)
+                    .Select(e => (Text: _formatter.Format(e), Level: e.LogLevel))
+                    .ToList();
 
-                    if (coloredEntries.Count > 0)
-                    {
-                        await ConsoleColorManager.WriteColoredBatchAsync(coloredEntries, cancellationToken);
-                        await Console.Out.FlushAsync();
-                    }
-                }
-                else
+                if (coloredEntries.Count > 0)
                 {
-                    // COMPATIBILIDADE: Código original para output redirecionado
-                    foreach (var entry in entries)
-                    {
-                        if (cancellationToken.IsCancellationRequested)
-                            break;
-
-                        await Console.Out.WriteLineAsync(_formatter.Format(entry));
-                    }
+                    await ConsoleColorManager.WriteColoredBatchAsync(coloredEntries, cancellationToken);
                     await Console.Out.FlushAsync();
                 }
             }
@@ -147,7 +102,6 @@ namespace CustomLogger.Sinks
                 // Absorve falha (mantido)
             }
         }
-
         public void Dispose()
         {
             try
@@ -183,6 +137,28 @@ namespace CustomLogger.Sinks
                 ConsoleColor.White        // Default (None)
             };
 
+            // Mapa de ConsoleColor para código ANSI (refatoração de GetAnsiCode)
+            private static readonly Dictionary<ConsoleColor, string> _consoleColorToAnsi =
+                new Dictionary<ConsoleColor, string>
+                {
+                    { ConsoleColor.Black, "\x1b[30m" },
+                    { ConsoleColor.DarkBlue, "\x1b[34m" },
+                    { ConsoleColor.DarkGreen, "\x1b[32m" },
+                    { ConsoleColor.DarkCyan, "\x1b[36m" },
+                    { ConsoleColor.DarkRed, "\x1b[31m" },
+                    { ConsoleColor.DarkMagenta, "\x1b[35m" },
+                    { ConsoleColor.DarkYellow, "\x1b[33m" },
+                    { ConsoleColor.Gray, "\x1b[37m" },
+                    { ConsoleColor.DarkGray, "\x1b[90m" },
+                    { ConsoleColor.Blue, "\x1b[94m" },
+                    { ConsoleColor.Green, "\x1b[92m" },
+                    { ConsoleColor.Cyan, "\x1b[96m" },
+                    { ConsoleColor.Red, "\x1b[91m" },
+                    { ConsoleColor.Magenta, "\x1b[95m" },
+                    { ConsoleColor.Yellow, "\x1b[93m" },
+                    { ConsoleColor.White, "\x1b[97m" }
+                };
+
             // Cache de strings ANSI para melhor performance
 
             static ConsoleColorManager()
@@ -212,47 +188,20 @@ namespace CustomLogger.Sinks
                 try
                 {
                     // Método 1: Variável de ambiente (comum em terminais modernos)
-                    if (Environment.GetEnvironmentVariable("TERM") != null)
+                    if (HasTermEnvironmentVariable())
                         return true;
 
-                    // Método 2: Platform detection
-                    if (Environment.GetEnvironmentVariable("WT_SESSION") != null) // Windows Terminal
-                        return true;
-
-                    if (Environment.GetEnvironmentVariable("VSCODE_PID") != null) // VS Code
+                    // Método 2: Detecção específica de platform
+                    if (IsWindowsTerminalOrVsCode())
                         return true;
 
                     // Método 3: RuntimeInformation
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        // Windows 10+ suporta ANSI nativamente
-                        if (Environment.OSVersion.Version.Major >= 10)
-                            return true;
-                    }
-                    else
-                    {
-                        // Linux/macOS geralmente suportam ANSI
+                    if (IsAnsiSupportedByPlatform())
                         return true;
-                    }
 
                     // Método 4: Console propriedade (disponível no .NET 5+)
-                    if (Console.IsOutputRedirected == false)
-                    {
-                        try
-                        {
-                            // Tenta escrever um código ANSI e verificar cursor position
-                            // (método heurístico)
-                            var originalLeft = Console.CursorLeft;
-                            Console.Write("\x1b[6n"); // Query cursor position
-                            Task.Delay(50).Wait(); // Pequena pausa
-                            if (Console.CursorLeft != originalLeft)
-                                return true;
-                        }
-                        catch
-                        {
-                            // Ignora falhas na detecção
-                        }
-                    }
+                    if (IsAnsiSupportedByHeuristic())
+                        return true;
 
                     return false;
                 }
@@ -262,6 +211,58 @@ namespace CustomLogger.Sinks
                 }
             }
 
+            /// <summary>
+            /// Verifica se TERM está definido (indica terminal moderno)
+            /// </summary>
+            private static bool HasTermEnvironmentVariable()
+            {
+                return Environment.GetEnvironmentVariable("TERM") != null;
+            }
+
+            /// <summary>
+            /// Detecta Windows Terminal ou VS Code (ambientes com suporte a ANSI garantido)
+            /// </summary>
+            private static bool IsWindowsTerminalOrVsCode()
+            {
+                var modernTerminals = new[] { "WT_SESSION", "VSCODE_PID" };
+                return modernTerminals.Any(env => Environment.GetEnvironmentVariable(env) != null);
+            }
+
+            /// <summary>
+            /// Verifica suporte ANSI baseado no SO
+            /// </summary>
+            private static bool IsAnsiSupportedByPlatform()
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    // Windows 10+ suporta ANSI nativamente
+                    return Environment.OSVersion.Version.Major >= 10;
+                }
+
+                // Linux/macOS geralmente suportam ANSI
+                return true;
+            }
+
+            /// <summary>
+            /// Tenta detecção heurística de ANSI via cursor position query
+            /// </summary>
+            private static bool IsAnsiSupportedByHeuristic()
+            {
+                if (Console.IsOutputRedirected)
+                    return false;
+
+                try
+                {
+                    var originalLeft = Console.CursorLeft;
+                    Console.Write("\x1b[6n"); // Query cursor position
+                    Task.Delay(50).Wait(); // Pequena pausa
+                    return Console.CursorLeft != originalLeft;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
             /// <summary>
             /// Detectar se estamos em console não-interativo (CI/CD, Docker)
             /// </summary>
@@ -316,39 +317,10 @@ namespace CustomLogger.Sinks
             }
 
             /// <summary>
-            /// Escreve texto colorido de forma síncrona
-            /// </summary>
-            public static void WriteColored(string text, LogLevel logLevel)
-            {
-                if (string.IsNullOrEmpty(text))
-                    return;
-
-                var originalColor = Console.ForegroundColor;
-
-                try
-                {
-                    // 1. Aplica cor baseada no nível
-                    ApplyColor(logLevel);
-
-                    // 2. Escreve o texto
-                    Console.Write(text);
-                }
-                finally
-                {
-                    // 3. Restaura cor original (garantido!)
-                    Console.ForegroundColor = originalColor;
-                }
-            }
-
-            /// <summary>
             /// Escreve linha colorida de forma síncrona (texto + newline)
-            /// </summary>
-            /// <summary>
-            /// Escreve linha colorida usando o método apropriado (ANSI ou ConsoleColor)
             /// </summary>
             public static void WriteColoredLine(string text, LogLevel logLevel)
             {
-                // Em diferentes ambientes, verificar comportamento
                 if (string.IsNullOrEmpty(text))
                 {
                     Console.WriteLine();
@@ -362,16 +334,7 @@ namespace CustomLogger.Sinks
                     return;
                 }
 
-                if (_hasAnsiSupport && !_isNonInteractiveConsole)
-                {
-                    // ✅ Usa ANSI codes (mais performático, não muda estado global)
-                    WriteWithAnsi(text, logLevel);
-                }
-                else
-                {
-                    // ✅ Fallback para ConsoleColor (compatibilidade)
-                    WriteWithConsoleColor(text, logLevel);
-                }
+                WriteColoredLineCore(text, logLevel, isAsync: false).Wait();
             }
 
             /// <summary>
@@ -392,51 +355,77 @@ namespace CustomLogger.Sinks
                     return;
                 }
 
+                await WriteColoredLineCore(text, logLevel, isAsync: true, cancellationToken);
+            }
+
+            /// <summary>
+            /// Template Method: Núcleo compartilhado entre síncrono e assíncrono
+            /// Reduz duplicação e centraliza decisão de ANSI vs ConsoleColor
+            /// </summary>
+            private static async Task WriteColoredLineCore(
+                string text,
+                LogLevel logLevel,
+                bool isAsync = false,
+                CancellationToken cancellationToken = default)
+            {
                 if (_hasAnsiSupport && !_isNonInteractiveConsole)
                 {
-                    // ✅ Usa ANSI codes
-                    await WriteWithAnsiAsync(text, logLevel, cancellationToken);
+                    await WriteWithAnsiCore(text, logLevel, isAsync, cancellationToken);
                 }
                 else
                 {
-                    // ✅ Fallback para ConsoleColor
-                    await WriteWithConsoleColorAsync(text, logLevel, cancellationToken);
+                    await WriteWithConsoleColorCore(text, logLevel, isAsync, cancellationToken);
                 }
             }
 
             /// <summary>
             /// Escreve com ANSI escape codes (não altera Console.ForegroundColor)
+            /// Versão unificada síncrono/assíncrono
             /// </summary>
-            private static void WriteWithAnsi(string text, LogLevel logLevel)
+            private static async Task WriteWithAnsiCore(
+                string text,
+                LogLevel logLevel,
+                bool isAsync = false,
+                CancellationToken cancellationToken = default)
             {
                 int levelIndex = MapLogLevelToIndex(logLevel);
                 string ansiCode = _ansiColorCodes[levelIndex];
+                string coloredText = string.Concat(ansiCode, text, AnsiResetCode, Environment.NewLine);
 
-                // Formato: <ANSI_COLOR>text<ANSI_RESET>
-                Console.WriteLine($"{ansiCode}{text}{AnsiResetCode}");
-            }
-
-            private static async Task WriteWithAnsiAsync(string text, LogLevel logLevel, CancellationToken cancellationToken)
-            {
-                int levelIndex = MapLogLevelToIndex(logLevel);
-                string ansiCode = _ansiColorCodes[levelIndex];
-
-                // Concatenação eficiente
-                var coloredText = string.Concat(ansiCode, text, AnsiResetCode, Environment.NewLine);
-                await Console.Out.WriteAsync(coloredText);
+                if (isAsync)
+                {
+                    await Console.Out.WriteAsync(coloredText);
+                }
+                else
+                {
+                    Console.Write(coloredText);
+                }
             }
 
             /// <summary>
-            /// Método original usando Console.ForegroundColor (fallback)
+            /// Escreve com Console.ForegroundColor (fallback)
+            /// Versão unificada síncrono/assíncrono
             /// </summary>
-            private static void WriteWithConsoleColor(string text, LogLevel logLevel)
+            private static async Task WriteWithConsoleColorCore(
+                string text,
+                LogLevel logLevel,
+                bool isAsync = false,
+                CancellationToken cancellationToken = default)
             {
                 var originalColor = Console.ForegroundColor;
 
                 try
                 {
                     ApplyColor(logLevel);
-                    Console.WriteLine(text);
+
+                    if (isAsync)
+                    {
+                        await Console.Out.WriteLineAsync(text);
+                    }
+                    else
+                    {
+                        Console.WriteLine(text);
+                    }
                 }
                 finally
                 {
@@ -444,23 +433,8 @@ namespace CustomLogger.Sinks
                 }
             }
 
-            private static async Task WriteWithConsoleColorAsync(string text, LogLevel logLevel, CancellationToken cancellationToken)
-            {
-                var originalColor = Console.ForegroundColor;
-
-                try
-                {
-                    ApplyColor(logLevel);
-                    await Console.Out.WriteLineAsync(text);
-                }
-                finally
-                {
-                    Console.ForegroundColor = originalColor;
-                }
-            }
-
             /// <summary>
-            /// Versão otimizada para batch usando ANSI
+            /// Versão otimizada para batch usando ANSI ou ConsoleColor
             /// </summary>
             public static async Task WriteColoredBatchAsync(
                 IEnumerable<(string Text, LogLevel Level)> entries,
@@ -481,23 +455,23 @@ namespace CustomLogger.Sinks
 
                 if (_hasAnsiSupport && !_isNonInteractiveConsole)
                 {
-                    await WriteBatchWithAnsiAsync(entries, cancellationToken);
+                    await WriteBatchWithAnsiCore(entries, cancellationToken);
                 }
                 else
                 {
-                    await WriteBatchWithConsoleColorAsync(entries, cancellationToken);
+                    await WriteBatchWithConsoleColorCore(entries, cancellationToken);
                 }
             }
 
             /// <summary>
-            /// Batch otimizado com ANSI - agrupa por cor para menos concatenações
+            /// Batch com ANSI - agrupa por cor para menos concatenações
             /// </summary>
-            private static async Task WriteBatchWithAnsiAsync(
+            private static async Task WriteBatchWithAnsiCore(
                 IEnumerable<(string Text, LogLevel Level)> entries,
                 CancellationToken cancellationToken)
             {
                 var builder = new StringBuilder();
-                string currentAnsiCode = null;
+                int currentLevelIndex = -1;
 
                 foreach (var (text, level) in entries)
                 {
@@ -505,24 +479,19 @@ namespace CustomLogger.Sinks
                         break;
 
                     int levelIndex = MapLogLevelToIndex(level);
-                    string ansiCode = _ansiColorCodes[levelIndex];
 
                     // Se mudou a cor, finaliza o bloco anterior
-                    if (currentAnsiCode != ansiCode)
+                    if (currentLevelIndex != levelIndex)
                     {
                         if (builder.Length > 0)
                         {
                             await Console.Out.WriteAsync(builder.ToString());
                             builder.Clear();
                         }
-                        currentAnsiCode = ansiCode;
+                        currentLevelIndex = levelIndex;
                     }
 
-                    // Concatena eficientemente: cor + texto + reset + newline
-                    builder.Append(ansiCode);
-                    builder.Append(text);
-                    builder.Append(AnsiResetCode);
-                    builder.AppendLine();
+                    AppendColoredLineToBuffer(builder, text, levelIndex);
 
                     // Flush a cada 100 linhas para não consumir muita memória
                     if (builder.Length > 8192) // ~8KB
@@ -540,9 +509,9 @@ namespace CustomLogger.Sinks
             }
 
             /// <summary>
-            /// Batch usando Console.ForegroundColor (fallback para quando ANSI não está disponível)
+            /// Batch com ConsoleColor (fallback para quando ANSI não está disponível)
             /// </summary>
-            private static async Task WriteBatchWithConsoleColorAsync(
+            private static async Task WriteBatchWithConsoleColorCore(
                 IEnumerable<(string Text, LogLevel Level)> entries,
                 CancellationToken cancellationToken)
             {
@@ -556,7 +525,7 @@ namespace CustomLogger.Sinks
                         if (cancellationToken.IsCancellationRequested)
                             break;
 
-                        // ✅ OTIMIZAÇÃO: Só muda cor se necessário
+                        // OTIMIZAÇÃO: Só muda cor se necessário
                         if (level != lastLevel)
                         {
                             ApplyColor(level);
@@ -571,6 +540,17 @@ namespace CustomLogger.Sinks
                     // Restaura cor original
                     Console.ForegroundColor = originalColor;
                 }
+            }
+
+            /// <summary>
+            /// Append eficiente de linha colorida no buffer (ANSI)
+            /// </summary>
+            private static void AppendColoredLineToBuffer(StringBuilder builder, string text, int levelIndex)
+            {
+                builder.Append(_ansiColorCodes[levelIndex]);
+                builder.Append(text);
+                builder.Append(AnsiResetCode);
+                builder.AppendLine();
             }
 
             /// <summary>
@@ -608,47 +588,13 @@ namespace CustomLogger.Sinks
 
             /// <summary>
             /// Converte ConsoleColor para código ANSI (para uso futuro)
+            /// Refatorado: usa dicionário estático em vez de switch
             /// </summary>
             private static string GetAnsiCode(ConsoleColor color)
             {
-                switch (color)
-                {
-                    case ConsoleColor.Black:
-                        return "\x1b[30m";
-                    case ConsoleColor.DarkBlue:
-                        return "\x1b[34m";
-                    case ConsoleColor.DarkGreen:
-                        return "\x1b[32m";
-                    case ConsoleColor.DarkCyan:
-                        return "\x1b[36m";
-                    case ConsoleColor.DarkRed:
-                        return "\x1b[31m";
-                    case ConsoleColor.DarkMagenta:
-                        return "\x1b[35m";
-                    case ConsoleColor.DarkYellow:
-                        return "\x1b[33m";
-                    case ConsoleColor.Gray:
-                        return "\x1b[37m";
-                    case ConsoleColor.DarkGray:
-                        return "\x1b[90m";
-                    case ConsoleColor.Blue:
-                        return "\x1b[94m";
-                    case ConsoleColor.Green:
-                        return "\x1b[92m";
-                    case ConsoleColor.Cyan:
-                        return "\x1b[96m";
-                    case ConsoleColor.Red:
-                        return "\x1b[91m";
-                    case ConsoleColor.Magenta:
-                        return "\x1b[95m";
-                    case ConsoleColor.Yellow:
-                        return "\x1b[93m";
-                    case ConsoleColor.White:
-                        return "\x1b[97m";
-                    default:
-                        return "\x1b[97m"; // White como fallback
-                }
-
+                return _consoleColorToAnsi.TryGetValue(color, out var code)
+                    ? code
+                    : "\x1b[97m"; // White como fallback
             }
 
             /// <summary>
