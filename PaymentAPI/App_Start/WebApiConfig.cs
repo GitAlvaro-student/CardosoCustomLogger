@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CustomLogger.Http;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web.Http;
@@ -10,7 +11,10 @@ namespace PaymentAPI
         public static void Register(HttpConfiguration config)
         {
             // Web API configuration and services
+            var logger = WebApiApplication.Global.LoggerFactory
+                .CreateLogger("CustomLogger.WebApi.Request");
 
+            config.MessageHandlers.Add(new CustomLoggerHttpHandler(logger));
             // Web API routes
             config.MapHttpAttributeRoutes();
 

@@ -59,6 +59,9 @@ namespace CustomLogger.Loggers
         /// <summary>
         /// Método central de logging.
         /// </summary>
+        /// <summary>
+        /// Método central de logging.
+        /// </summary>
         public void Log<TState>(
             LogLevel logLevel,
             EventId eventId,
@@ -86,6 +89,17 @@ namespace CustomLogger.Loggers
             var serviceName = _configuration.Options.ServiceName;
             var environment = _configuration.Options.Environment;
 
+            // Capturar scopes
+            var scopes = _logScopeProvider.GetScopes();
+
+            // Extrair propriedades HTTP dos scopes (se existirem)
+            var httpMethod = ExtractFromScopes<string>(scopes, "HttpMethod");
+            var httpPath = ExtractFromScopes<string>(scopes, "HttpPath");
+            var httpStatusCode = ExtractFromScopes<int?>(scopes, "HttpStatusCode");
+            var httpDurationMs = ExtractFromScopes<long?>(scopes, "HttpDurationMs");
+            var clientIpAddress = ExtractFromScopes<string>(scopes, "ClientIpAddress");
+            var serverIpAddress = ExtractFromScopes<string>(scopes, "ServerIpAddress");
+
             // Neste ponto, apenas estruturamos o evento.
             // A escrita real será responsabilidade do buffer/sink futuramente.
             var entry = new BufferedLogEntry(
@@ -96,12 +110,18 @@ namespace CustomLogger.Loggers
                 message,
                 exception,
                 state,
-                _logScopeProvider.GetScopes(),
+                scopes,
                 traceId,
                 spanId,
                 parentSpanId,
                 serviceName,
-                environment
+                environment,
+                httpMethod,
+                httpPath,
+                httpStatusCode,
+                httpDurationMs,
+                clientIpAddress,
+                serverIpAddress
             );
 
             _buffer.EnqueueAsync(entry);
@@ -110,6 +130,33 @@ namespace CustomLogger.Loggers
             // Ponto de extensão:
             // Aqui futuramente o log será enviado para buffer ou sink
             // Ex: LogDispatcher.Dispatch(logEntry);
+        }
+
+        /// <summary>
+        /// Extrai uma propriedade do dicionário de scopes com conversão segura de tipo.
+        /// </summary>
+        private static T ExtractFromScopes<T>(IReadOnlyDictionary<string, object> scopes, string key)
+        {
+            if (scopes == null || !scopes.TryGetValue(key, out var value))
+                return default;
+
+            if (value is T typedValue)
+                return typedValue;
+
+            // Tentativa de conversão para tipos nullable
+            if (typeof(T) == typeof(int?) && value != null)
+            {
+                if (int.TryParse(value.ToString(), out var intValue))
+                    return (T)(object)intValue;
+            }
+
+            if (typeof(T) == typeof(long?) && value != null)
+            {
+                if (long.TryParse(value.ToString(), out var longValue))
+                    return (T)(object)longValue;
+            }
+
+            return default;
         }
     }
 }

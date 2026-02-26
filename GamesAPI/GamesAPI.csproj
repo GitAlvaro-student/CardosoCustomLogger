@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CustomLogger.AspNetCore.HealthChecks\CustomLogger.AspNetCore.HealthChecks.csproj" />
+    <ProjectReference Include="..\CustomLogger.AspNetCore\CustomLogger.AspNetCore.csproj" />
     <ProjectReference Include="..\CustomLogger.HealthChecks\CustomLogger.HealthChecks.csproj" />
     <ProjectReference Include="..\CustomLogger.OpenTelemetry\CustomLogger.OpenTelemetry.csproj" />
     <ProjectReference Include="..\CustomLogger\CustomLogger.csproj" />

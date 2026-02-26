@@ -22,5 +22,11 @@ namespace CustomLogger.Models
         public string ParentSpanId { get; set; }
         public string ServiceName { get; set; }
         public string Environment { get; set; }
+        public string HttpMethod { get; set; }
+        public string HttpPath { get; set; }
+        public int? HttpStatusCode { get; set; }
+        public long? HttpDurationMs { get; set; }
+        public string ClientIpAddress { get; set; }
+        public string ServerIpAddress { get; set; }
     }
 }

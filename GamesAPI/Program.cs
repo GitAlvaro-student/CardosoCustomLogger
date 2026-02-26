@@ -1,5 +1,6 @@
 using CustomLogger.Abstractions;
 using CustomLogger.AspNetCore.HealthChecks;
+using CustomLogger.AspNetCore;
 using CustomLogger.HealthChecks;
 using CustomLogger.HealthChecks.Abstractions;
 using CustomLogger.OpenTelemetry;
@@ -62,6 +63,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCustomLoggerHttp();
 
 app.UseHttpsRedirection();
 

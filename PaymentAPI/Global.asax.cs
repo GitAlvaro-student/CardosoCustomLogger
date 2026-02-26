@@ -2,10 +2,12 @@
 using CustomLogger.Adapters;
 using CustomLogger.HealthChecks;
 using CustomLogger.HealthChecks.Models;
+using CustomLogger.Http;
 using CustomLogger.OpenTelemetry;
 using CustomLogger.Providers;
 using Microsoft.Extensions.Logging;
 using PaymentAPI.Services;
+using System.Net.Http;
 using System.Web.Http;
 using Unity;
 using Unity.AspNet.WebApi;
@@ -18,6 +20,13 @@ namespace PaymentAPI
 
         protected void Application_Start()
         {
+
+            // Logging
+            var provider = InitializeCustomLogger();
+
+            // OpenTelemetry
+            OpenTelemetryBootstrapper.InitializeFromConfig();
+
             GlobalConfiguration.Configure(WebApiConfig.Register);
 
             // Configurar Unity Container para DI
@@ -27,12 +36,6 @@ namespace PaymentAPI
 
             // Habilitar CORS
             GlobalConfiguration.Configuration.EnableCors();
-
-            // Logging
-            var provider = InitializeCustomLogger();
-
-            // OpenTelemetry
-            OpenTelemetryBootstrapper.InitializeFromConfig();
 
             // Inicializar health monitor
             var evaluator = new DefaultLoggingHealthEvaluator();

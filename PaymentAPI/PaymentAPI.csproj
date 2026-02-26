@@ -363,6 +363,10 @@
       <Project>{b82ed402-e5d4-490f-ac02-71c8eddf9134}</Project>
       <Name>CustomLogger.HealthChecks</Name>
     </ProjectReference>
+    <ProjectReference Include="..\CustomLogger.Http\CustomLogger.Http.csproj">
+      <Project>{43d83857-1f0a-4892-85dc-7a892279033d}</Project>
+      <Name>CustomLogger.Http</Name>
+    </ProjectReference>
     <ProjectReference Include="..\CustomLogger.OpenTelemetry.AspNet\CustomLogger.OpenTelemetry.AspNet.csproj">
       <Project>{b85a1fe5-1a78-4a33-a1e8-117becd02311}</Project>
       <Name>CustomLogger.OpenTelemetry.AspNet</Name>

@@ -20,5 +20,11 @@ namespace CustomLogger.Abstractions
         string ParentSpanId { get; }
         string ServiceName { get; }
         string Environment { get; }
+        string HttpMethod { get; }
+        string HttpPath { get; }
+        int? HttpStatusCode { get; }
+        long? HttpDurationMs { get; }
+        string ClientIpAddress { get; }
+        string ServerIpAddress { get; }
     }
 }

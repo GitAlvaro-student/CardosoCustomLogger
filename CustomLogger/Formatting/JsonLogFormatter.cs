@@ -37,6 +37,12 @@ namespace CustomLogger.Formatting
                     exception = FormatException(entry.Exception),
                     scopes = entry.Scopes,
                     state = FormatState(entry.State),
+                    httpMethod = entry.HttpMethod,
+                    httpPath = entry.HttpPath,
+                    httpStatusCode = entry.HttpStatusCode,
+                    httpDurationMs = entry.HttpDurationMs,
+                    clientIpAddress = entry.ClientIpAddress,
+                    serverIpAddress = entry.ServerIpAddress
                 }, _options);
             }
             catch

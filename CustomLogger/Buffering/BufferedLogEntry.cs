@@ -13,7 +13,10 @@ namespace CustomLogger.Buffering
     {
         public BufferedLogEntry(DateTimeOffset timestamp, string category, LogLevel logLevel, EventId eventId,
             string message, Exception exception, object state, IReadOnlyDictionary<string, object> scopes,
-            string traceId = null, string spanId = null, string parentSpanId = null, string serviceName = null, string environment = null)
+            string traceId = null, string spanId = null, string parentSpanId = null, string serviceName = null,
+            string environment = null, string httpMethod = null, string httpPath = null,
+            int? httpStatusCode = null, long? httpDurationMs = null, string clientIpAddress = null,
+            string serverIpAddress = null)
         {
             Timestamp = timestamp;
             Category = category;
@@ -28,6 +31,18 @@ namespace CustomLogger.Buffering
             ParentSpanId = parentSpanId;
             ServiceName = serviceName;
             Environment = environment;
+            HttpMethod = httpMethod;
+            HttpPath = httpPath;
+            HttpStatusCode = httpStatusCode;
+            HttpDurationMs = httpDurationMs;
+            ClientIpAddress = clientIpAddress;
+            ServerIpAddress = serverIpAddress;
+            HttpMethod = httpMethod;
+            HttpPath = httpPath;
+            HttpStatusCode = httpStatusCode;
+            HttpDurationMs = httpDurationMs;
+            ClientIpAddress = clientIpAddress;
+            ServerIpAddress = serverIpAddress;
         }
 
         public DateTimeOffset Timestamp { get; set; }
@@ -50,6 +65,12 @@ namespace CustomLogger.Buffering
         public string ParentSpanId { get; }
         public string ServiceName { get; }
         public string Environment { get; }
+        public string HttpMethod { get; }
+        public string HttpPath { get; }
+        public int? HttpStatusCode { get; }
+        public long? HttpDurationMs { get; }
+        public string ClientIpAddress { get; }
+        public string ServerIpAddress { get; }
 
     }
 }
