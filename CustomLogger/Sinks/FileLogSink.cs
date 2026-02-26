@@ -16,6 +16,17 @@ namespace CustomLogger.Sinks
         private readonly StreamWriter _writer;
         private bool _disposed;
 
+        private static string ResolveFilePath(string filePath)
+        {
+            // Com extensão → arquivo completo
+            if (Path.HasExtension(filePath))
+                return filePath;
+
+            // Sem extensão → diretório + padrão
+            var defaultFileName = $"logs_{DateTimeOffset.UtcNow:yyyy-MM-dd}.log";
+            return Path.Combine(filePath, defaultFileName);
+        }
+
         public FileLogSink(
             string filePath,
             ILogFormatter formatter,
@@ -24,10 +35,7 @@ namespace CustomLogger.Sinks
             _formatter = formatter
                 ?? throw new ArgumentNullException(nameof(formatter));
 
-            // Aplica nomenclatura padrão se filePath não for fornecido
-            var resolvedPath = string.IsNullOrWhiteSpace(filePath)
-                ? $"logs_{DateTimeOffset.UtcNow:yyyy-MM-dd}.log"
-                : filePath;
+            var resolvedPath = ResolveFilePath(filePath);
 
             var directory = Path.GetDirectoryName(resolvedPath);
             if (!string.IsNullOrEmpty(directory))
